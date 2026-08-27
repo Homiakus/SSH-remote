@@ -51,13 +51,16 @@ func TestServerListKeySetupResultRefreshesServer(t *testing.T) {
 func TestServerListShowsBrokenConfigWarning(t *testing.T) {
 	withTempScreenWorkingDir(t)
 
-	if err := os.MkdirAll("servers", 0o755); err != nil {
-		t.Fatalf("mkdir servers: %v", err)
+	if err := config.SaveServer("good", &config.ServerConfig{
+		Name:       "good",
+		Host:       "127.0.0.1",
+		User:       "root",
+		AuthMethod: config.AuthMethodPassword,
+		Password:   "secret",
+	}); err != nil {
+		t.Fatalf("save good server: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join("servers", "good.env"), []byte("SSH_HOST=127.0.0.1\nSSH_USER=root\nSSH_AUTH_METHOD=password\n"), 0o600); err != nil {
-		t.Fatalf("write good config: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join("servers", "broken.env"), []byte("SSH_HOST=\"unterminated\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join("servers", "broken.vault"), []byte("not valid vault data"), 0o600); err != nil {
 		t.Fatalf("write broken config: %v", err)
 	}
 
@@ -65,7 +68,7 @@ func TestServerListShowsBrokenConfigWarning(t *testing.T) {
 	if len(m.servers) != 1 || m.servers[0].Name != "good" {
 		t.Fatalf("servers = %+v, want only good server", m.servers)
 	}
-	if !strings.Contains(m.message, "broken.env") {
+	if !strings.Contains(m.message, "broken.vault") {
 		t.Fatalf("expected broken config warning, got %q", m.message)
 	}
 }

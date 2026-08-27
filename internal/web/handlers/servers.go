@@ -22,6 +22,7 @@ type ServerDTO struct {
 	Description string `json:"description"`
 	Status      string `json:"status,omitempty"`
 	LatencyMs   int64  `json:"latency_ms,omitempty"`
+	HasPassword bool   `json:"has_password,omitempty"`
 }
 
 // HandleServers handles GET (list) and POST (create/update) for servers.
@@ -44,8 +45,9 @@ func HandleServers(w http.ResponseWriter, r *http.Request) {
 				Port:        s.Port,
 				User:        s.User,
 				AuthMethod:  s.AuthMethod,
-				KeyPath:     s.KeyPath,
+				KeyPath:     maskKeyPath(s.KeyPath),
 				Description: s.Description,
+				HasPassword: s.Password != "",
 			})
 		}
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -131,8 +133,9 @@ func HandleServerDetail(w http.ResponseWriter, r *http.Request) {
 				Port:        cfg.Port,
 				User:        cfg.User,
 				AuthMethod:  cfg.AuthMethod,
-				KeyPath:     cfg.KeyPath,
+				KeyPath:     maskKeyPath(cfg.KeyPath),
 				Description: cfg.Description,
+				HasPassword: cfg.Password != "",
 			},
 		})
 
@@ -223,4 +226,12 @@ func HandleServerDiagnostics(w http.ResponseWriter, r *http.Request) {
 			return ""
 		}(),
 	})
+}
+
+// maskKeyPath replaces vault-embedded key paths with a safe display string.
+func maskKeyPath(keyPath string) string {
+	if config.IsEmbeddedKey(keyPath) {
+		return "[embedded]"
+	}
+	return keyPath
 }

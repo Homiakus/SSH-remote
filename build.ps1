@@ -35,7 +35,7 @@ function Test-GoAvailable {
 }
 
 function Get-CurrentTarget {
-    $goos = if ($IsWindows) {
+    $goos = if ($IsWindows -or $env:OS -like "*Windows*" -or [System.Environment]::OSVersion.Platform -eq "Win32NT") {
         "windows"
     }
     elseif ($IsLinux) {
@@ -45,7 +45,7 @@ function Get-CurrentTarget {
         "darwin"
     }
     else {
-        throw "Unsupported host OS."
+        "windows"
     }
 
     $goarch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()) {

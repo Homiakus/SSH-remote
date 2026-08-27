@@ -356,10 +356,23 @@ const SSHPilotApp = {
       if (window.SSHPilotKeys) window.SSHPilotKeys.loadKeys();
     } else if (viewName === 'servers') {
       if (window.SSHPilotServers) window.SSHPilotServers.loadServers();
+    } else if (viewName === 'monitoring') {
+      if (window.MonitoringController) window.MonitoringController.onActivated(window.SSHPilotState.activeServer);
+    } else if (viewName === 'diagnostics') {
+      if (window.DiagnosticsController) window.DiagnosticsController.onActivated(window.SSHPilotState.activeServer);
+    } else if (viewName === 'loadtest') {
+      if (window.LoadTestController) window.LoadTestController.onActivated();
     } else if (viewName === 'console') {
       if (window.SSHPilotTerminalInstance) {
         window.SSHPilotTerminalInstance.handleResize();
       }
+    }
+
+    if (viewName !== 'monitoring' && window.MonitoringController) {
+      window.MonitoringController.onDeactivated();
+    }
+    if (viewName !== 'loadtest' && window.LoadTestController) {
+      window.LoadTestController.onDeactivated();
     }
 
     this.checkHorizontalOverflow();
@@ -440,6 +453,8 @@ const SSHPilotApp = {
 
         if (key === 'Escape') {
           window.SSHPilotTerminalInstance.sendRaw('\x1b');
+        } else if (key === 'Backspace') {
+          window.SSHPilotTerminalInstance.sendRaw('\x7f');
         } else if (key === 'Tab') {
           window.SSHPilotTerminalInstance.sendRaw('\t');
         } else if (key === '/') {
@@ -584,6 +599,7 @@ const SSHPilotApp = {
   }
 };
 
+window.SSHPilot = SSHPilotApp;
 window.SSHPilotApp = SSHPilotApp;
 window.SSHPilotTheme = SSHPilotTheme;
 

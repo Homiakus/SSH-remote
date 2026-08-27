@@ -1,9 +1,10 @@
 package ssh
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
-	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -107,30 +108,25 @@ func TestBuildPasswordAuthRequiresPassword(t *testing.T) {
 	}
 }
 
-func TestTOFUHostKeyCallbackRequiresExplicitTrustForUnknownHostKey(t *testing.T) {
+func TestTOFUHostKeyCallbackAutoTrustsOnFirstUse(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "known_hosts")
 	callback := tofuHostKeyCallback(path)
 	addr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2222}
 	key := testPublicKey(t)
 
+	// First time: should automatically trust on first use
 	err := callback("example.test:2222", addr, key)
-	if err == nil {
-		t.Fatal("expected unknown host key error")
+	if err != nil {
+		t.Fatalf("expected TOFU to succeed on first use, got: %v", err)
 	}
-	var unknown UnknownHostKeyError
-	if !errors.As(err, &unknown) {
-		t.Fatalf("expected UnknownHostKeyError, got %T: %v", err, err)
-	}
-	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
-		t.Fatalf("known_hosts should not be created before explicit trust, stat err = %v", statErr)
+	if _, statErr := os.Stat(path); statErr != nil {
+		t.Fatalf("known_hosts should be created after first use, stat err = %v", statErr)
 	}
 
-	if err := trustHostKey(path, "example.test:2222", key); err != nil {
-		t.Fatalf("trust host key: %v", err)
-	}
+	// Subsequent call with same key should succeed
 	if err := callback("example.test:2222", addr, key); err != nil {
-		t.Fatalf("callback after explicit trust: %v", err)
+		t.Fatalf("callback after TOFU trust: %v", err)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -151,6 +147,30 @@ func TestTOFUHostKeyCallbackRejectsChangedHostKey(t *testing.T) {
 	}
 	if err := callback("example.test:2222", addr, testPublicKey(t)); err == nil {
 		t.Fatal("expected changed host key error")
+	}
+}
+
+func TestTOFUHostKeyCallbackAllowsDifferentKeyAlgorithmType(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	callback := tofuHostKeyCallback(path)
+	addr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2222}
+
+	edKey := testPublicKey(t)
+	if err := trustHostKey(path, "example.test:2222", edKey); err != nil {
+		t.Fatalf("trust host key: %v", err)
+	}
+
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate ecdsa: %v", err)
+	}
+	signer, err := gossh.NewSignerFromKey(ecdsaKey)
+	if err != nil {
+		t.Fatalf("new signer: %v", err)
+	}
+
+	if err := callback("example.test:2222", addr, signer.PublicKey()); err != nil {
+		t.Fatalf("expected callback to trust new algorithm type, got: %v", err)
 	}
 }
 

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	gossh "golang.org/x/crypto/ssh"
+
+	"sshpilot/internal/config"
 )
 
 func TestEnsureServerKeyPairGeneratesParseableKey(t *testing.T) {
@@ -26,7 +28,7 @@ func TestEnsureServerKeyPairGeneratesParseableKey(t *testing.T) {
 	if _, err := gossh.ParsePrivateKey(privateData); err != nil {
 		t.Fatalf("generated private key does not parse: %v", err)
 	}
-	if _, err := buildKeyAuth(pair.RelativePrivateKeyPath, ""); err != nil {
+	if _, err := buildKeyAuth(&config.ServerConfig{KeyPath: pair.RelativePrivateKeyPath}); err != nil {
 		t.Fatalf("buildKeyAuth() with generated key error = %v", err)
 	}
 

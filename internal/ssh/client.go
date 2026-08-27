@@ -45,7 +45,7 @@ func connectionTarget(cfg *config.ServerConfig) string {
 // Connect устанавливает SSH-подключение к серверу по конфигурации.
 // Использует TOFU (Trust On First Use) для проверки host key через
 // собственный known_hosts-файл в servers/known_hosts.
-// Таймаут подключения: 10 секунд.
+// Таймаут подключения: 20 секунд.
 func Connect(cfg *config.ServerConfig) (*ssh.Client, error) {
 	authMethods, err := buildAuthMethods(cfg)
 	if err != nil {
@@ -56,16 +56,78 @@ func Connect(cfg *config.ServerConfig) (*ssh.Client, error) {
 		User:            strings.TrimSpace(cfg.User),
 		Auth:            authMethods,
 		HostKeyCallback: tofuHostKeyCallback(config.KnownHostsPath()),
-		Timeout:         10 * time.Second,
+		Timeout:         20 * time.Second,
+		HostKeyAlgorithms: []string{
+			ssh.KeyAlgoED25519,
+			ssh.KeyAlgoECDSA256,
+			ssh.KeyAlgoECDSA384,
+			ssh.KeyAlgoECDSA521,
+			ssh.KeyAlgoRSASHA512,
+			ssh.KeyAlgoRSASHA256,
+			ssh.KeyAlgoRSA,
+		},
+		Config: ssh.Config{
+			Ciphers: []string{
+				"chacha20-poly1305@openssh.com",
+				"aes128-gcm@openssh.com",
+				"aes256-gcm@openssh.com",
+				"aes128-ctr",
+				"aes192-ctr",
+				"aes256-ctr",
+				"aes128-cbc",
+				"aes256-cbc",
+			},
+			KeyExchanges: []string{
+				"curve25519-sha256",
+				"curve25519-sha256@libssh.org",
+				"ecdh-sha2-nistp256",
+				"ecdh-sha2-nistp384",
+				"ecdh-sha2-nistp521",
+				"diffie-hellman-group14-sha256",
+				"diffie-hellman-group14-sha1",
+				"diffie-hellman-group-exchange-sha256",
+			},
+			MACs: []string{
+				"hmac-sha2-256-etm@openssh.com",
+				"hmac-sha2-512-etm@openssh.com",
+				"hmac-sha2-256",
+				"hmac-sha2-512",
+				"hmac-sha1",
+			},
+		},
 	}
 
 	addr := net.JoinHostPort(strings.TrimSpace(cfg.Host), effectivePort(cfg))
-	client, err := ssh.Dial("tcp", addr, sshConfig)
-	if err != nil {
-		return nil, fmt.Errorf("не удалось подключиться к %s — %w", connectionTarget(cfg), err)
+	dialer := net.Dialer{
+		Timeout:   20 * time.Second,
+		KeepAlive: 15 * time.Second,
 	}
 
-	return client, nil
+	conn, err := dialer.Dial("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось установить TCP соединение с %s: %w", connectionTarget(cfg), err)
+	}
+
+	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
+	if err != nil {
+		_ = conn.Close()
+		// If transient EOF / connection reset on high-latency networks, retry once after short backoff
+		if strings.Contains(err.Error(), "EOF") || strings.Contains(err.Error(), "reset") {
+			time.Sleep(400 * time.Millisecond)
+			connRetry, errRetry := dialer.Dial("tcp", addr)
+			if errRetry == nil {
+				ncc, chans, reqs, err = ssh.NewClientConn(connRetry, addr, sshConfig)
+				if err != nil {
+					_ = connRetry.Close()
+				}
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("не удалось подключиться к %s — %w", connectionTarget(cfg), err)
+		}
+	}
+
+	return ssh.NewClient(ncc, chans, reqs), nil
 }
 
 // TestConnection проверяет SSH-подключение: коннект + создание сессии + echo-тест.
@@ -219,7 +281,7 @@ func ExecuteScriptStream(ctx context.Context, client *ssh.Client, scriptContent 
 func buildAuthMethods(cfg *config.ServerConfig) ([]ssh.AuthMethod, error) {
 	switch config.NormalizeAuthMethod(cfg.AuthMethod) {
 	case config.AuthMethodKey:
-		return buildKeyAuth(cfg.KeyPath, cfg.Passphrase)
+		return buildKeyAuth(cfg)
 	default:
 		return buildPasswordAuth(cfg.Password)
 	}
@@ -245,20 +307,28 @@ func buildPasswordAuth(password string) ([]ssh.AuthMethod, error) {
 }
 
 // buildKeyAuth создаёт аутентификацию по приватному ключу.
-func buildKeyAuth(keyPath, passphrase string) ([]ssh.AuthMethod, error) {
-	resolvedPath, err := config.ResolveKeyPath(keyPath)
-	if err != nil {
-		return nil, err
-	}
+// Поддерживает как vault-embedded ключи, так и файловые.
+func buildKeyAuth(cfg *config.ServerConfig) ([]ssh.AuthMethod, error) {
+	var keyData []byte
+	var err error
 
-	keyData, err := os.ReadFile(resolvedPath)
-	if err != nil {
-		return nil, fmt.Errorf("не удалось прочитать ключ %s: %w", resolvedPath, err)
+	if config.IsEmbeddedKey(cfg.KeyPath) && cfg.EmbeddedKey != "" {
+		// Key is stored inside the encrypted vault.
+		keyData = []byte(cfg.EmbeddedKey)
+	} else {
+		resolvedPath, pathErr := config.ResolveKeyPath(cfg.KeyPath)
+		if pathErr != nil {
+			return nil, pathErr
+		}
+		keyData, err = os.ReadFile(resolvedPath)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось прочитать ключ %s: %w", resolvedPath, err)
+		}
 	}
 
 	var signer ssh.Signer
-	if passphrase != "" {
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(passphrase))
+	if cfg.Passphrase != "" {
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(cfg.Passphrase))
 	} else {
 		signer, err = ssh.ParsePrivateKey(keyData)
 	}

@@ -7,16 +7,36 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
-const serversDir = "servers"
+var serversDir = "servers"
+
 const knownHostsName = "known_hosts"
+
+// masterKeyOnce holds the lazily-initialised master key for vault operations.
+var globalMasterKey *MasterKey
+
+// InitMasterKey loads or creates the master key. Must be called before
+// any vault operations (LoadServer, SaveServer, etc.).
+func InitMasterKey() error {
+	mk, err := LoadOrCreateMasterKey()
+	if err != nil {
+		return err
+	}
+	globalMasterKey = mk
+	return nil
+}
+
+func ensureMasterKey() (*MasterKey, error) {
+	if globalMasterKey != nil {
+		return globalMasterKey, nil
+	}
+	return nil, fmt.Errorf("master key не инициализирован: вызовите config.InitMasterKey()")
+}
 
 // ServerConfig хранит настройки SSH-подключения к серверу.
 type ServerConfig struct {
-	Name        string // Имя сервера (= имя файла без .env)
+	Name        string // Имя сервера (= имя файла без .vault)
 	Host        string // SSH_HOST
 	Port        string // SSH_PORT
 	User        string // SSH_USER
@@ -25,6 +45,7 @@ type ServerConfig struct {
 	KeyPath     string // SSH_KEY_PATH (если AuthMethod = "key")
 	Passphrase  string // SSH_KEY_PASSPHRASE (опционально, для ключа)
 	Description string // SSH_DESCRIPTION
+	EmbeddedKey string // PEM-encoded private key stored inside vault
 }
 
 // EnsureServersDir создаёт папку servers/ если она не существует.
@@ -51,11 +72,11 @@ func ListServers() ([]ServerConfig, error) {
 	var servers []ServerConfig
 	var loadErrs []error
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".env") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), vaultExt) {
 			continue
 		}
 
-		name := strings.TrimSuffix(entry.Name(), ".env")
+		name := strings.TrimSuffix(entry.Name(), vaultExt)
 		cfg, err := LoadServer(name)
 		if err != nil {
 			loadErrs = append(loadErrs, fmt.Errorf("%s: %w", entry.Name(), err))
@@ -71,31 +92,31 @@ func ListServers() ([]ServerConfig, error) {
 	return servers, errors.Join(loadErrs...)
 }
 
-// LoadServer загружает конфигурацию сервера из файла servers/<name>.env.
+// LoadServer загружает конфигурацию сервера из зашифрованного файла servers/<name>.vault.
 func LoadServer(name string) (*ServerConfig, error) {
 	name = strings.TrimSpace(name)
 	if err := ValidateServerName(name); err != nil {
 		return nil, err
 	}
 
-	path := filepath.Join(serversDir, name+".env")
+	mk, err := ensureMasterKey()
+	if err != nil {
+		return nil, err
+	}
 
-	envMap, err := godotenv.Read(path)
+	path := filepath.Join(serversDir, name+vaultExt)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось загрузить %s: %w", path, err)
 	}
 
-	cfg := &ServerConfig{
-		Name:        name,
-		Host:        strings.TrimSpace(envMap["SSH_HOST"]),
-		Port:        strings.TrimSpace(envMap["SSH_PORT"]),
-		User:        strings.TrimSpace(envMap["SSH_USER"]),
-		AuthMethod:  NormalizeAuthMethod(envMap["SSH_AUTH_METHOD"]),
-		Password:    envMap["SSH_PASSWORD"],
-		KeyPath:     strings.TrimSpace(envMap["SSH_KEY_PATH"]),
-		Passphrase:  envMap["SSH_KEY_PASSPHRASE"],
-		Description: strings.TrimSpace(envMap["SSH_DESCRIPTION"]),
+	vault, err := DecryptVault(mk, data)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось расшифровать %s: %w", path, err)
 	}
+
+	vault.Name = name
+	cfg := vaultToConfig(vault)
 
 	if err := ValidateHost(cfg.Host); err != nil {
 		return nil, fmt.Errorf("невалидный хост в %s: %w", path, err)
@@ -104,7 +125,7 @@ func LoadServer(name string) (*ServerConfig, error) {
 	return cfg, nil
 }
 
-// SaveServer сохраняет конфигурацию сервера в файл servers/<name>.env.
+// SaveServer сохраняет конфигурацию сервера в зашифрованный файл servers/<name>.vault.
 func SaveServer(name string, cfg *ServerConfig) error {
 	if err := EnsureServersDir(); err != nil {
 		return err
@@ -114,31 +135,22 @@ func SaveServer(name string, cfg *ServerConfig) error {
 		return err
 	}
 
-	authMethod := NormalizeAuthMethod(cfg.AuthMethod)
-	envMap := map[string]string{
-		"SSH_HOST":        strings.TrimSpace(cfg.Host),
-		"SSH_PORT":        strings.TrimSpace(cfg.Port),
-		"SSH_USER":        strings.TrimSpace(cfg.User),
-		"SSH_AUTH_METHOD": authMethod,
-		"SSH_DESCRIPTION": cfg.Description,
-	}
-
-	if authMethod == AuthMethodPassword {
-		envMap["SSH_PASSWORD"] = cfg.Password
-	} else {
-		envMap["SSH_KEY_PATH"] = cfg.KeyPath
-		if cfg.Passphrase != "" {
-			envMap["SSH_KEY_PASSPHRASE"] = cfg.Passphrase
-		}
-	}
-
-	content, err := godotenv.Marshal(envMap)
+	mk, err := ensureMasterKey()
 	if err != nil {
-		return fmt.Errorf("не удалось сериализовать конфиг: %w", err)
+		return err
 	}
 
-	path := filepath.Join(serversDir, name+".env")
-	return writeFileAtomic(path, []byte(content), 0600)
+	cfg.AuthMethod = NormalizeAuthMethod(cfg.AuthMethod)
+	cfg.Name = name
+	vault := configToVault(cfg)
+
+	data, err := EncryptVault(mk, vault)
+	if err != nil {
+		return fmt.Errorf("не удалось зашифровать конфиг: %w", err)
+	}
+
+	path := filepath.Join(serversDir, name+vaultExt)
+	return writeFileAtomic(path, data, 0600)
 }
 
 // DeleteServer удаляет файл конфигурации сервера.
@@ -147,7 +159,7 @@ func DeleteServer(name string) error {
 	if err := ValidateServerName(name); err != nil {
 		return err
 	}
-	path := filepath.Join(serversDir, name+".env")
+	path := filepath.Join(serversDir, name+vaultExt)
 	return os.Remove(path)
 }
 
@@ -157,7 +169,7 @@ func ServerExists(name string) bool {
 	if err := ValidateServerName(name); err != nil {
 		return false
 	}
-	path := filepath.Join(serversDir, name+".env")
+	path := filepath.Join(serversDir, name+vaultExt)
 	_, err := os.Stat(path)
 	return err == nil
 }

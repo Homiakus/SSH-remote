@@ -29,14 +29,30 @@ func NewRouter() http.Handler {
 	mux.HandleFunc("/api/servers", handlers.HandleServers)
 	mux.HandleFunc("/api/servers/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if strings.HasSuffix(path, "/test") {
+		switch {
+		case strings.HasSuffix(path, "/test"):
 			handlers.HandleServerTest(w, r)
-		} else if strings.HasSuffix(path, "/diagnostics") {
-			handlers.HandleServerDiagnostics(w, r)
-		} else {
+		case strings.HasSuffix(path, "/metrics"):
+			handlers.HandleServerMetrics(w, r)
+		case strings.HasSuffix(path, "/process/kill"):
+			handlers.HandleProcessKill(w, r)
+		case strings.HasSuffix(path, "/service/action"):
+			handlers.HandleServiceAction(w, r)
+		case strings.HasSuffix(path, "/diagnostics/run"), strings.HasSuffix(path, "/diagnostics"):
+			handlers.HandleServerDiagnosticsAudit(w, r)
+		case strings.HasSuffix(path, "/diagnostics/ping"):
+			handlers.HandleServerPingJitter(w, r)
+		case strings.HasSuffix(path, "/diagnostics/logs"):
+			handlers.HandleServerLogs(w, r)
+		case strings.HasSuffix(path, "/diagnostics/exec"):
+			handlers.HandleServerDiagnosticExec(w, r)
+		default:
 			handlers.HandleServerDetail(w, r)
 		}
 	})
+
+	mux.HandleFunc("/api/loadtest", handlers.HandleLoadTest)
+	mux.HandleFunc("/api/loadtest/", handlers.HandleLoadTest)
 
 	mux.HandleFunc("/api/keys", handlers.HandleKeys)
 	mux.HandleFunc("/api/fs/", handlers.HandleFS)

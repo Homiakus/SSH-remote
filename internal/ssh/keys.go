@@ -19,12 +19,30 @@ type GeneratedKeyPair struct {
 	PrivateKeyPath         string
 	PublicKeyPath          string
 	PublicAuthorizedKey    string
+	EmbeddedPrivateKey     string // PEM data for vault embedding
 }
 
 // EnsureServerKeyPair создаёт или переиспользует ED25519 ключ для указанного сервера.
-// Ключи хранятся в servers/keys/<server>.ed25519 и .ed25519.pub.
+// При использовании vault-хранилища ключ встраивается прямо в vault.
 // При первом вызове генерирует новую пару, при повторном — возвращает существующую.
 func EnsureServerKeyPair(serverName string) (GeneratedKeyPair, error) {
+	// Check if server already has an embedded key in vault.
+	cfg, loadErr := config.LoadServer(serverName)
+	if loadErr == nil && cfg.EmbeddedKey != "" {
+		publicKey, err := authorizedPublicKeyFromPrivate([]byte(cfg.EmbeddedKey), serverName)
+		if err != nil {
+			return GeneratedKeyPair{}, fmt.Errorf("не удалось получить публичный ключ из embedded key: %w", err)
+		}
+		return GeneratedKeyPair{
+			RelativePrivateKeyPath: config.EmbeddedKeyPathValue(),
+			PrivateKeyPath:         "",
+			PublicKeyPath:          "",
+			PublicAuthorizedKey:    publicKey,
+			EmbeddedPrivateKey:     cfg.EmbeddedKey,
+		}, nil
+	}
+
+	// Also check for legacy file-based key.
 	relativePrivatePath, err := config.DefaultKeyPath(serverName)
 	if err != nil {
 		return GeneratedKeyPair{}, err
@@ -42,33 +60,31 @@ func EnsureServerKeyPair(serverName string) (GeneratedKeyPair, error) {
 	if err != nil {
 		return GeneratedKeyPair{}, err
 	}
-	if err := config.EnsureKeysDir(); err != nil {
-		return GeneratedKeyPair{}, err
-	}
 
-	privateData, err := os.ReadFile(privatePath)
+	var privateData []byte
+	privateData, err = os.ReadFile(privatePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return GeneratedKeyPair{}, fmt.Errorf("не удалось прочитать приватный ключ %s: %w", privatePath, err)
 		}
 
+		// Generate new key pair
 		privateData, err = generateOpenSSHPrivateKey(serverName)
 		if err != nil {
 			return GeneratedKeyPair{}, err
 		}
-		if err := os.WriteFile(privatePath, privateData, 0600); err != nil {
-			return GeneratedKeyPair{}, fmt.Errorf("не удалось записать приватный ключ %s: %w", privatePath, err)
+		if err := config.EnsureKeysDir(); err == nil {
+			_ = os.WriteFile(privatePath, privateData, 0600)
+			pubKey, pubErr := authorizedPublicKeyFromPrivate(privateData, serverName)
+			if pubErr == nil {
+				_ = os.WriteFile(publicPath, []byte(pubKey), 0644)
+			}
 		}
-	} else if err := os.Chmod(privatePath, 0600); err != nil {
-		return GeneratedKeyPair{}, fmt.Errorf("не удалось выставить права на приватный ключ %s: %w", privatePath, err)
 	}
 
 	publicKey, err := authorizedPublicKeyFromPrivate(privateData, serverName)
 	if err != nil {
-		return GeneratedKeyPair{}, fmt.Errorf("не удалось получить публичный ключ из %s: %w", privatePath, err)
-	}
-	if err := os.WriteFile(publicPath, []byte(publicKey+"\n"), 0644); err != nil {
-		return GeneratedKeyPair{}, fmt.Errorf("не удалось записать публичный ключ %s: %w", publicPath, err)
+		return GeneratedKeyPair{}, fmt.Errorf("не удалось получить публичный ключ: %w", err)
 	}
 
 	return GeneratedKeyPair{
@@ -76,6 +92,7 @@ func EnsureServerKeyPair(serverName string) (GeneratedKeyPair, error) {
 		PrivateKeyPath:         privatePath,
 		PublicKeyPath:          publicPath,
 		PublicAuthorizedKey:    publicKey,
+		EmbeddedPrivateKey:     string(privateData),
 	}, nil
 }
 
@@ -116,6 +133,7 @@ func SetupGeneratedKeyAuth(cfg *config.ServerConfig) (*config.ServerConfig, erro
 	keyCfg.AuthMethod = config.AuthMethodKey
 	keyCfg.Password = ""
 	keyCfg.KeyPath = keyPair.RelativePrivateKeyPath
+	keyCfg.EmbeddedKey = keyPair.EmbeddedPrivateKey
 	keyCfg.Passphrase = ""
 	if err := TestConnection(keyCfg); err != nil {
 		return nil, fmt.Errorf("ключ установлен, но проверка входа по ключу не прошла: %w", err)
@@ -209,6 +227,7 @@ func cloneConfigForAuth(cfg *config.ServerConfig) *config.ServerConfig {
 		AuthMethod:  cfg.AuthMethod,
 		Password:    cfg.Password,
 		KeyPath:     cfg.KeyPath,
+		EmbeddedKey: cfg.EmbeddedKey,
 		Passphrase:  cfg.Passphrase,
 		Description: cfg.Description,
 	}

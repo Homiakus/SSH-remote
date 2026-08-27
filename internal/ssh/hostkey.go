@@ -40,15 +40,33 @@ func tofuHostKeyCallback(path string) gossh.HostKeyCallback {
 			if !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("не удалось прочитать known_hosts %s: %w", path, err)
 			}
-			return newUnknownHostKeyError(path, hostname, key)
+			// File does not exist yet -> Trust on first use and record
+			return trustHostKeyLocked(path, hostname, key)
 		}
 
 		if err := callback(hostname, remote, key); err == nil {
 			return nil
 		} else {
 			var keyErr *knownhosts.KeyError
-			if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
-				return newUnknownHostKeyError(path, hostname, key)
+			if errors.As(err, &keyErr) {
+				if len(keyErr.Want) == 0 {
+					// Host not present in known_hosts -> Trust on first use and append
+					return trustHostKeyLocked(path, hostname, key)
+				}
+
+				// Check if there is already a key of the SAME algorithm type for this host
+				hasSameType := false
+				for _, want := range keyErr.Want {
+					if want.Key.Type() == key.Type() {
+						hasSameType = true
+						break
+					}
+				}
+
+				// If no key of this type exists yet (e.g. host had ecdsa, now negotiating ed25519), trust and append
+				if !hasSameType {
+					return trustHostKeyLocked(path, hostname, key)
+				}
 			}
 			return fmt.Errorf("SSH host key для %s не совпадает с %s: %w", hostname, path, err)
 		}

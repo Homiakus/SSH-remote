@@ -33,6 +33,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize encrypted vault storage.
+	if err := config.InitMasterKey(); err != nil {
+		fmt.Fprintf(os.Stderr, "Vault init error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Auto-migrate legacy .env configs to encrypted .vault format.
+	mk, _ := config.LoadOrCreateMasterKey()
+	if migrated, errs := config.MigrateEnvToVault(mk); migrated > 0 {
+		fmt.Printf("  ✓ Migrated %d server config(s) to encrypted vault format\n", migrated)
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "  ⚠ Migration warning: %v\n", e)
+		}
+	}
+
 	if *runTUI {
 		app := ui.NewAppModel()
 		p := tea.NewProgram(app, tea.WithAltScreen())

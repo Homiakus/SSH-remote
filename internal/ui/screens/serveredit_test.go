@@ -111,6 +111,9 @@ func withTempScreenWorkingDir(t *testing.T) {
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("chdir temp dir: %v", err)
 	}
+	if err := config.InitMasterKey(); err != nil {
+		t.Fatalf("InitMasterKey: %v", err)
+	}
 	t.Cleanup(func() {
 		if err := os.Chdir(origWD); err != nil {
 			t.Fatalf("restore wd: %v", err)

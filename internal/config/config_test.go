@@ -1,106 +1,102 @@
 package config
 
 import (
+	"crypto/rand"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestLoadServerKeepsEmptyPort(t *testing.T) {
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
+// setupVaultTestDir sets up a temp servers dir with an initialized master key.
+func setupVaultTestDir(t *testing.T) (cleanup func()) {
+	t.Helper()
+	origDir := serversDir
+	origKey := globalMasterKey
+
+	tmpDir := t.TempDir()
+	serversDir = filepath.Join(tmpDir, "servers")
+	if err := os.MkdirAll(serversDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
 
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
+	mk := &MasterKey{}
+	if _, err := io.ReadFull(rand.Reader, mk.raw[:]); err != nil {
+		t.Fatalf("generate key: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(origWD); err != nil {
-			t.Fatalf("restore wd: %v", err)
-		}
-	})
+	globalMasterKey = mk
 
-	content := "SSH_HOST=185.72.144.39\nSSH_PORT=\nSSH_USER=root\nSSH_AUTH_METHOD=password\n"
-	path := filepath.Join(tempDir, "servers", "empty.env")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir servers: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write env: %v", err)
-	}
-
-	cfg, err := LoadServer("empty")
-	if err != nil {
-		t.Fatalf("load server: %v", err)
-	}
-
-	if cfg.Port != "" {
-		t.Fatalf("expected empty port, got %q", cfg.Port)
+	return func() {
+		serversDir = origDir
+		globalMasterKey = origKey
 	}
 }
 
-func TestLoadServerKeepsExplicitPort22(t *testing.T) {
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
+func TestSaveAndLoadServerKeepsEmptyPort(t *testing.T) {
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
+
+	cfg := &ServerConfig{
+		Name:       "empty",
+		Host:       "185.72.144.39",
+		Port:       "",
+		User:       "root",
+		AuthMethod: "password",
+		Password:   "test",
+	}
+	if err := SaveServer("empty", cfg); err != nil {
+		t.Fatalf("save server: %v", err)
 	}
 
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(origWD); err != nil {
-			t.Fatalf("restore wd: %v", err)
-		}
-	})
-
-	content := "SSH_HOST=185.72.144.39\nSSH_PORT=22\nSSH_USER=root\nSSH_AUTH_METHOD=password\n"
-	path := filepath.Join(tempDir, "servers", "explicit.env")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir servers: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write env: %v", err)
-	}
-
-	cfg, err := LoadServer("explicit")
+	loaded, err := LoadServer("empty")
 	if err != nil {
 		t.Fatalf("load server: %v", err)
 	}
+	if loaded.Port != "" {
+		t.Fatalf("expected empty port, got %q", loaded.Port)
+	}
+}
 
-	if cfg.Port != "22" {
-		t.Fatalf("expected port 22, got %q", cfg.Port)
+func TestSaveAndLoadServerKeepsExplicitPort22(t *testing.T) {
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
+
+	cfg := &ServerConfig{
+		Name:       "explicit",
+		Host:       "185.72.144.39",
+		Port:       "22",
+		User:       "root",
+		AuthMethod: "password",
+		Password:   "test",
+	}
+	if err := SaveServer("explicit", cfg); err != nil {
+		t.Fatalf("save server: %v", err)
+	}
+
+	loaded, err := LoadServer("explicit")
+	if err != nil {
+		t.Fatalf("load server: %v", err)
+	}
+	if loaded.Port != "22" {
+		t.Fatalf("expected port 22, got %q", loaded.Port)
 	}
 }
 
 func TestListServersReturnsValidServersAndBrokenConfigError(t *testing.T) {
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
+
+	// Save a valid server.
+	if err := SaveServer("good", &ServerConfig{
+		Name: "good", Host: "127.0.0.1", User: "root", AuthMethod: "password", Password: "x",
+	}); err != nil {
+		t.Fatalf("save good: %v", err)
 	}
 
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(origWD); err != nil {
-			t.Fatalf("restore wd: %v", err)
-		}
-	})
-
-	serversDir := filepath.Join(tempDir, "servers")
-	if err := os.MkdirAll(serversDir, 0o755); err != nil {
-		t.Fatalf("mkdir servers: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(serversDir, "good.env"), []byte("SSH_HOST=127.0.0.1\nSSH_USER=root\nSSH_AUTH_METHOD=password\n"), 0o600); err != nil {
-		t.Fatalf("write good config: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(serversDir, "broken.env"), []byte("SSH_HOST=\"unterminated\n"), 0o600); err != nil {
-		t.Fatalf("write broken config: %v", err)
+	// Write a broken vault file.
+	brokenPath := filepath.Join(serversDir, "broken.vault")
+	if err := os.WriteFile(brokenPath, []byte("corrupted data"), 0600); err != nil {
+		t.Fatalf("write broken: %v", err)
 	}
 
 	servers, err := ListServers()
@@ -109,5 +105,62 @@ func TestListServersReturnsValidServersAndBrokenConfigError(t *testing.T) {
 	}
 	if len(servers) != 1 || servers[0].Name != "good" {
 		t.Fatalf("servers = %+v, want only good server", servers)
+	}
+}
+
+func TestDeleteServerRemovesVault(t *testing.T) {
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
+
+	if err := SaveServer("del", &ServerConfig{
+		Name: "del", Host: "1.2.3.4", User: "root", AuthMethod: "password", Password: "x",
+	}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if !ServerExists("del") {
+		t.Fatal("server should exist after save")
+	}
+
+	if err := DeleteServer("del"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if ServerExists("del") {
+		t.Fatal("server should not exist after delete")
+	}
+}
+
+func TestSaveAndLoadServerWithEmbeddedKey(t *testing.T) {
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
+
+	cfg := &ServerConfig{
+		Name:        "keysrv",
+		Host:        "10.0.0.1",
+		Port:        "22",
+		User:        "deploy",
+		AuthMethod:  "key",
+		EmbeddedKey: "-----BEGIN OPENSSH PRIVATE KEY-----\nfakedata\n-----END OPENSSH PRIVATE KEY-----",
+		Passphrase:  "mypass",
+		Description: "test key server",
+	}
+	if err := SaveServer("keysrv", cfg); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := LoadServer("keysrv")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if loaded.EmbeddedKey != cfg.EmbeddedKey {
+		t.Fatalf("EmbeddedKey mismatch: got %q", loaded.EmbeddedKey)
+	}
+	if loaded.KeyPath != embeddedKeyPath {
+		t.Fatalf("KeyPath = %q, want %q", loaded.KeyPath, embeddedKeyPath)
+	}
+	if loaded.Passphrase != "mypass" {
+		t.Fatalf("Passphrase = %q, want %q", loaded.Passphrase, "mypass")
 	}
 }

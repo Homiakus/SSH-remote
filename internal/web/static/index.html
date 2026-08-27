@@ -91,6 +91,26 @@
       <line x1="18" y1="6" x2="6" y2="18"></line>
       <line x1="6" y1="6" x2="18" y2="18"></line>
     </symbol>
+    <symbol id="icon-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+      <rect x="9" y="9" width="6" height="6"></rect>
+      <line x1="9" y1="1" x2="9" y2="4"></line>
+      <line x1="15" y1="1" x2="15" y2="4"></line>
+      <line x1="9" y1="20" x2="9" y2="23"></line>
+      <line x1="15" y1="20" x2="15" y2="23"></line>
+      <line x1="20" y1="9" x2="23" y2="9"></line>
+      <line x1="20" y1="15" x2="23" y2="15"></line>
+      <line x1="1" y1="9" x2="4" y2="9"></line>
+      <line x1="1" y1="15" x2="4" y2="15"></line>
+    </symbol>
+    <symbol id="icon-stethoscope" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"></path>
+      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"></path>
+      <circle cx="20" cy="10" r="2"></circle>
+    </symbol>
+    <symbol id="icon-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </symbol>
   </svg>
 
   <!-- Mobile Navigation Drawer Overlay -->
@@ -128,6 +148,18 @@
         <button class="mobile-nav-item" data-view="keys">
           <svg class="tab-icon"><use href="#icon-key"></use></svg>
           <span>05 // SSH KEY VAULT</span>
+        </button>
+        <button class="mobile-nav-item" data-view="monitoring">
+          <svg class="tab-icon"><use href="#icon-cpu"></use></svg>
+          <span>06 // SERVER MONITORING</span>
+        </button>
+        <button class="mobile-nav-item" data-view="diagnostics">
+          <svg class="tab-icon"><use href="#icon-stethoscope"></use></svg>
+          <span>07 // DIAGNOSTICS & DEBUG</span>
+        </button>
+        <button class="mobile-nav-item" data-view="loadtest">
+          <svg class="tab-icon"><use href="#icon-zap"></use></svg>
+          <span>08 // LOAD TESTING</span>
         </button>
       </nav>
       <div class="mobile-drawer-footer">
@@ -173,6 +205,18 @@
         <button class="nav-tab" data-view="keys" id="nav-btn-keys">
           <svg class="tab-icon"><use href="#icon-key"></use></svg>
           <span class="tab-index">05</span> SSH KEYS
+        </button>
+        <button class="nav-tab" data-view="monitoring" id="nav-btn-monitoring">
+          <svg class="tab-icon"><use href="#icon-cpu"></use></svg>
+          <span class="tab-index">06</span> MONITORING
+        </button>
+        <button class="nav-tab" data-view="diagnostics" id="nav-btn-diagnostics">
+          <svg class="tab-icon"><use href="#icon-stethoscope"></use></svg>
+          <span class="tab-index">07</span> DIAGNOSTICS
+        </button>
+        <button class="nav-tab" data-view="loadtest" id="nav-btn-loadtest">
+          <svg class="tab-icon"><use href="#icon-zap"></use></svg>
+          <span class="tab-index">08</span> LOAD TEST
         </button>
       </nav>
 
@@ -327,6 +371,468 @@
       </div>
     </main>
 
+    <!-- SECTION 06: SERVER MONITORING -->
+    <main id="view-monitoring" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">06 // FLEET TELEMETRY</span>
+          <h1 class="chapter-title">Server Monitoring</h1>
+          <p class="chapter-desc">Live CPU, memory, mount points, network throughput, active processes, and systemd service health.</p>
+        </div>
+        <div class="chapter-actions">
+          <div class="mon-controls-bar">
+            <select id="mon-server-select" class="form-select sm" style="min-width: 180px;">
+              <!-- Loaded via JS -->
+            </select>
+            <select id="mon-interval-select" class="form-select sm">
+              <option value="2000">Auto: 2s</option>
+              <option value="5000" selected>Auto: 5s</option>
+              <option value="10000">Auto: 10s</option>
+              <option value="0">Auto: Off</option>
+            </select>
+            <button id="btn-mon-refresh" class="btn-swiss">
+              <svg class="btn-icon" style="width: 13px; height: 13px;"><use href="#icon-refresh"></use></svg>
+              <span>REFRESH</span>
+            </button>
+            <span id="mon-status-indicator" class="mon-status-pill online">READY</span>
+          </div>
+        </div>
+      </section>
+
+      <div id="mon-host-meta" class="mon-meta-row">
+        <!-- Host OS/Kernel tags -->
+      </div>
+
+      <div class="mon-grid-top">
+        <!-- CPU Card -->
+        <div class="metric-dashboard-card">
+          <div class="metric-card-header">
+            <span class="micro-label">CPU UTILIZATION</span>
+            <span id="mon-cpu-val" class="mono metric-main-val">--%</span>
+          </div>
+          <div class="mon-progress-track lg">
+            <div id="mon-cpu-bar" class="mon-progress-fill primary" style="width: 0%;"></div>
+          </div>
+          <div id="mon-cpu-meta" class="mono micro-label" style="margin-top: 0.75rem; color: var(--text-secondary);">
+            -- Cores · Load Avg: --, --, --
+          </div>
+        </div>
+
+        <!-- Memory Card -->
+        <div class="metric-dashboard-card">
+          <div class="metric-card-header">
+            <span class="micro-label">MEMORY USAGE</span>
+            <span id="mon-mem-val" class="mono metric-main-val">--%</span>
+          </div>
+          <div class="mon-progress-track lg">
+            <div id="mon-mem-bar" class="mon-progress-fill warning" style="width: 0%;"></div>
+          </div>
+          <div id="mon-mem-meta" class="mono micro-label" style="margin-top: 0.75rem; color: var(--text-secondary);">
+            -- / --
+          </div>
+        </div>
+
+        <!-- Network I/O Card -->
+        <div class="metric-dashboard-card">
+          <div class="metric-card-header">
+            <span class="micro-label">NETWORK TRAFFIC</span>
+            <svg style="width: 16px; height: 16px; color: var(--accent);"><use href="#icon-activity"></use></svg>
+          </div>
+          <div class="mon-net-stats-row">
+            <div>
+              <span class="micro-label">RX RECEIVED</span>
+              <strong id="mon-net-rx" class="mono d-block font-16">-- B</strong>
+            </div>
+            <div>
+              <span class="micro-label">TX SENT</span>
+              <strong id="mon-net-tx" class="mono d-block font-16">-- B</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disk Storage Card -->
+        <div class="metric-dashboard-card">
+          <div class="metric-card-header">
+            <span class="micro-label">MOUNTED DISK STORAGE</span>
+            <svg style="width: 16px; height: 16px; color: var(--accent);"><use href="#icon-folder"></use></svg>
+          </div>
+          <div id="mon-disk-list" class="mon-disks-scroll">
+            <div class="mon-empty-sub">Loading disk metrics...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Process Table & Services Layout -->
+      <div class="mon-split-layout">
+        <!-- Top Processes -->
+        <div class="mon-split-main">
+          <div class="chapter-header sm">
+            <div class="chapter-meta">
+              <span class="micro-label">TASK MANAGER</span>
+              <h2 class="chapter-title sm">Active Processes</h2>
+            </div>
+            <div class="chapter-actions">
+              <input type="text" id="mon-proc-search" class="form-input sm" placeholder="Filter PID, user, cmd...">
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="fs-table">
+              <thead>
+                <tr>
+                  <th>PID</th>
+                  <th>USER</th>
+                  <th>CPU %</th>
+                  <th>MEM %</th>
+                  <th>COMMAND</th>
+                  <th style="text-align: right;">ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="mon-proc-table-body">
+                <tr><td colspan="6" class="table-empty">Loading processes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- System Services -->
+        <div class="mon-split-side">
+          <div class="chapter-header sm">
+            <div class="chapter-meta">
+              <span class="micro-label">SYSTEMD UNITS</span>
+              <h2 class="chapter-title sm">Core Services</h2>
+            </div>
+          </div>
+          <div id="mon-services-grid" class="mon-services-list">
+            <div class="mon-empty-sub">Loading service units...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- SECTION 07: DIAGNOSTICS & DEBUG -->
+    <main id="view-diagnostics" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">07 // DIAGNOSTIC SUITE</span>
+          <h1 class="chapter-title">Diagnostics & System Logs</h1>
+          <p class="chapter-desc">Multi-phase socket & cryptographic audit, network jitter probe, remote log viewer, and safe system diagnostic utilities.</p>
+        </div>
+        <div class="chapter-actions">
+          <div class="mon-controls-bar">
+            <select id="diag-server-select" class="form-select sm" style="min-width: 180px;">
+              <!-- Loaded via JS -->
+            </select>
+            <button id="btn-diag-run-audit" class="btn-swiss primary">
+              <svg class="btn-icon" style="width: 13px; height: 13px;"><use href="#icon-stethoscope"></use></svg>
+              <span>RUN FULL AUDIT</span>
+            </button>
+            <button id="btn-diag-ping" class="btn-swiss">
+              <svg class="btn-icon" style="width: 13px; height: 13px;"><use href="#icon-activity"></use></svg>
+              <span>PROBE JITTER</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Banner & Fingerprint Strip -->
+      <div class="diag-meta-grid">
+        <div class="metric-card-mini">
+          <span class="micro-label">SSH PROTOCOL BANNER</span>
+          <span id="diag-banner-box" class="mono val sm">--</span>
+        </div>
+        <div class="metric-card-mini">
+          <span class="micro-label">HOST KEY FINGERPRINT</span>
+          <span id="diag-key-box" class="mono val sm">--</span>
+        </div>
+      </div>
+
+      <!-- Audit Timeline -->
+      <div class="diag-section-box">
+        <div class="diag-box-header">
+          <span class="micro-label">MULTI-STAGE AUDIT TIMELINE</span>
+        </div>
+        <div id="diag-audit-timeline" class="diag-timeline-container">
+          <div class="diag-empty-sub">Click "RUN FULL AUDIT" to verify socket, SSH banner, handshake, SFTP subsystem, and latency.</div>
+        </div>
+      </div>
+
+      <!-- Ping & Jitter Visualization -->
+      <div class="diag-section-box">
+        <div class="diag-box-header">
+          <span class="micro-label">NETWORK JITTER & PACKET LOSS (10-PROBE SEQUENCE)</span>
+        </div>
+        <div id="diag-ping-results">
+          <div class="diag-empty-sub">Click "PROBE JITTER" to measure network latency distribution and packet loss.</div>
+        </div>
+      </div>
+
+      <!-- Remote System Logs & Diagnostic Tools -->
+      <div class="mon-split-layout">
+        <!-- Remote Logs -->
+        <div class="mon-split-main">
+          <div class="chapter-header sm">
+            <div class="chapter-meta">
+              <span class="micro-label">REMOTE LOG STREAM</span>
+              <h2 class="chapter-title sm">System Journal & Logs</h2>
+            </div>
+            <div class="chapter-actions">
+              <select id="diag-log-type" class="form-select sm">
+                <option value="journal">Journalctl (Default)</option>
+                <option value="syslog">/var/log/syslog</option>
+                <option value="auth">/var/log/auth.log</option>
+                <option value="dmesg">Kernel dmesg</option>
+              </select>
+              <input type="text" id="diag-log-search" class="form-input sm" placeholder="Search logs...">
+              <button id="btn-diag-fetch-logs" class="btn-swiss sm">FETCH</button>
+              <span id="diag-log-count" class="tag-badge sm">0 LINES</span>
+            </div>
+          </div>
+          <div id="diag-log-entries" class="diag-log-terminal">
+            <div class="diag-empty-sub">Click "FETCH" to stream remote system log entries.</div>
+          </div>
+        </div>
+
+        <!-- Quick Tools -->
+        <div class="mon-split-side">
+          <div class="chapter-header sm">
+            <div class="chapter-meta">
+              <span class="micro-label">DIAGNOSTIC UTILITIES</span>
+              <h2 class="chapter-title sm">Quick Probes</h2>
+            </div>
+          </div>
+          <div class="diag-tools-grid">
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="ports">OPEN PORTS (ss -tulpn)</button>
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="network">INTERFACES (ip addr)</button>
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="routes">ROUTES (ip route)</button>
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="disk">STORAGE (df -h -T)</button>
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="firewall">FIREWALL (ufw/iptables)</button>
+            <button class="btn-swiss xs btn-diag-cmd" data-cmd="uptime">UPTIME & UNAME</button>
+          </div>
+          <pre id="diag-cmd-output" class="diag-output-box mono">Select a diagnostic utility above to execute and inspect remote output.</pre>
+        </div>
+      </div>
+    </main>
+
+    <!-- SECTION 08: LOAD TESTING & STRESS BENCHMARK -->
+    <main id="view-loadtest" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">08 // STRESS BENCHMARK</span>
+          <h1 class="chapter-title">Load Testing Cockpit</h1>
+          <p class="chapter-desc">High-concurrency load generation for Web APIs, WebSocket terminals, and SSH connection pools with real-time latency percentiles.</p>
+        </div>
+        <div class="chapter-actions">
+          <span id="lt-cockpit-status" class="tag-badge">COCKPIT IDLE</span>
+        </div>
+      </section>
+
+      <!-- Load Test Setup Studio & Live Cockpit -->
+      <div class="mon-split-layout">
+        <!-- Configuration Studio -->
+        <div class="mon-split-side" style="flex: 1 1 360px;">
+          <div class="editorial-card">
+            <div class="card-header">
+              <span class="micro-label font-bold">BENCHMARK CONFIGURATION</span>
+            </div>
+            <div class="card-body" style="padding: 1.25rem;">
+              <div class="form-group full">
+                <label class="form-label">TARGET MODE</label>
+                <select id="lt-target-type" class="form-select">
+                  <option value="http">HTTP / REST API Endpoint</option>
+                  <option value="ssh_connect">SSH Connection & Handshake Stress</option>
+                  <option value="ssh_command">SSH Remote Command Throughput</option>
+                </select>
+              </div>
+
+              <!-- HTTP Settings -->
+              <div id="lt-http-group">
+                <div class="form-group full">
+                  <label class="form-label">ENDPOINT URL</label>
+                  <input type="text" id="lt-http-url" class="form-input mono sm" value="http://127.0.0.1:8080/api/servers">
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">METHOD</label>
+                  <select id="lt-http-method" class="form-select sm">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">REQUEST BODY (OPTIONAL)</label>
+                  <textarea id="lt-http-body" class="form-textarea mono sm" style="height: 60px;" placeholder='{"key":"value"}'></textarea>
+                </div>
+              </div>
+
+              <!-- SSH Server Settings -->
+              <div id="lt-ssh-group" style="display: none;">
+                <div class="form-group full">
+                  <label class="form-label">TARGET FLEET SERVER</label>
+                  <select id="lt-server-select" class="form-select">
+                    <!-- Loaded via JS -->
+                  </select>
+                </div>
+              </div>
+
+              <!-- SSH Command Settings -->
+              <div id="lt-cmd-group" style="display: none;">
+                <div class="form-group full">
+                  <label class="form-label">REMOTE COMMAND</label>
+                  <input type="text" id="lt-ssh-cmd" class="form-input mono sm" value="echo ok">
+                </div>
+              </div>
+
+              <div class="form-group full">
+                <div style="display: flex; justify-content: space-between;">
+                  <label class="form-label">CONCURRENCY WORKERS</label>
+                  <span id="lt-concurrency-val" class="mono font-bold">10</span>
+                </div>
+                <input type="range" id="lt-concurrency" min="1" max="100" value="10" class="form-range" style="width: 100%;">
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">TOTAL REQUESTS</label>
+                  <input type="number" id="lt-total-reqs" class="form-input sm" value="100" min="1">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">DURATION (SEC)</label>
+                  <input type="number" id="lt-duration" class="form-input sm" value="0" min="0" placeholder="0 = unlimited">
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">TARGET RPS LIMIT</label>
+                  <input type="number" id="lt-rps-limit" class="form-input sm" value="0" min="0" placeholder="0 = max">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">TIMEOUT (MS)</label>
+                  <input type="number" id="lt-timeout" class="form-input sm" value="5000">
+                </div>
+              </div>
+
+              <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem;">
+                <button id="btn-lt-start" class="btn-swiss primary" style="flex: 1; justify-content: center;">
+                  <svg class="btn-icon" style="width: 14px; height: 14px;"><use href="#icon-zap"></use></svg>
+                  <span>START BENCHMARK</span>
+                </button>
+                <button id="btn-lt-stop" class="btn-swiss danger" disabled style="justify-content: center;">
+                  <span>STOP</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Cockpit Metrics & Percentiles -->
+        <div class="mon-split-main" style="flex: 2 1 500px;">
+          <!-- Big Numbers Cockpit -->
+          <div class="lt-cockpit-grid">
+            <div class="metric-card-cockpit">
+              <span class="micro-label">THROUGHPUT</span>
+              <div class="cockpit-val-group">
+                <span id="lt-res-rps" class="cockpit-number mono text-accent">0.0</span>
+                <span class="cockpit-unit mono">REQ / SEC</span>
+              </div>
+            </div>
+            <div class="metric-card-cockpit">
+              <span class="micro-label">TOTAL REQUESTS</span>
+              <div class="cockpit-val-group">
+                <span id="lt-res-sent" class="cockpit-number mono">0</span>
+                <span class="cockpit-unit mono">SENT</span>
+              </div>
+            </div>
+            <div class="metric-card-cockpit">
+              <span class="micro-label">SUCCESSFUL</span>
+              <div class="cockpit-val-group">
+                <span id="lt-res-success" class="cockpit-number mono text-success">0</span>
+                <span class="cockpit-unit mono">2xx / 3xx</span>
+              </div>
+            </div>
+            <div class="metric-card-cockpit">
+              <span class="micro-label">FAILED / ERRORS</span>
+              <div class="cockpit-val-group">
+                <span id="lt-res-failed" class="cockpit-number mono text-danger">0</span>
+                <span class="cockpit-unit mono">ERRORS</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="diag-section-box" style="margin-top: 1rem;">
+            <div class="diag-box-header" style="justify-content: space-between;">
+              <span class="micro-label">TEST EXECUTION PROGRESS</span>
+              <span id="lt-progress-pct" class="mono micro-label font-bold">0%</span>
+            </div>
+            <div class="mon-progress-track lg" style="margin-top: 0.5rem;">
+              <div id="lt-progress-bar" class="mon-progress-fill primary" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Latency Percentiles Cards -->
+          <div class="diag-section-box" style="margin-top: 1rem;">
+            <div class="diag-box-header">
+              <span class="micro-label">LATENCY DISTRIBUTION & PERCENTILES</span>
+            </div>
+            <div class="lt-percentiles-grid">
+              <div class="metric-card-mini"><span class="micro-label">MIN</span><span id="lt-min" class="mono val">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">AVG</span><span id="lt-avg" class="mono val">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">P50 (MEDIAN)</span><span id="lt-p50" class="mono val font-bold text-accent">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">P90</span><span id="lt-p90" class="mono val">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">P95</span><span id="lt-p95" class="mono val font-bold">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">P99</span><span id="lt-p99" class="mono val font-bold text-warning">-- ms</span></div>
+              <div class="metric-card-mini"><span class="micro-label">MAX</span><span id="lt-max" class="mono val text-danger">-- ms</span></div>
+            </div>
+
+            <!-- Recent Latency Stream Sparkline -->
+            <div style="margin-top: 1rem;">
+              <span class="micro-label" style="display: block; margin-bottom: 0.5rem;">RECENT SAMPLES STREAM</span>
+              <div id="lt-sparkline" class="lt-sparkline-track"></div>
+            </div>
+
+            <!-- Status Code Pills -->
+            <div style="margin-top: 1rem;">
+              <span class="micro-label" style="display: block; margin-bottom: 0.5rem;">STATUS CODES & ERROR BREAKDOWN</span>
+              <div id="lt-status-codes" class="lt-codes-row">
+                <span class="micro-label" style="color: var(--text-muted);">Awaiting benchmark run...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test History Table -->
+      <div class="diag-section-box" style="margin-top: 1.5rem;">
+        <div class="diag-box-header" style="justify-content: space-between;">
+          <span class="micro-label">BENCHMARK RUN HISTORY</span>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-lt-export" class="btn-swiss xs">EXPORT REPORT (JSON)</button>
+            <button id="btn-lt-refresh-history" class="btn-swiss xs">REFRESH</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>BENCHMARK</th>
+                <th>TARGET</th>
+                <th>CONCURRENCY</th>
+                <th>REQUESTS / RPS</th>
+                <th>SUCCESS RATE</th>
+                <th>LATENCY AVG (P95)</th>
+                <th>TIME</th>
+              </tr>
+            </thead>
+            <tbody id="lt-history-body">
+              <tr><td colspan="7" class="table-empty">No previous benchmark runs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
     <!-- Global Contextual Status Bar -->
     <footer class="global-status-bar">
       <div class="status-bar-left">
@@ -370,6 +876,18 @@
       <button class="mobile-bar-btn" data-view="keys" id="mob-btn-keys">
         <svg class="tab-icon"><use href="#icon-key"></use></svg>
         <span>Keys</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="monitoring" id="mob-btn-mon">
+        <svg class="tab-icon"><use href="#icon-cpu"></use></svg>
+        <span>Mon</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="diagnostics" id="mob-btn-diag">
+        <svg class="tab-icon"><use href="#icon-stethoscope"></use></svg>
+        <span>Diag</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="loadtest" id="mob-btn-load">
+        <svg class="tab-icon"><use href="#icon-zap"></use></svg>
+        <span>Load</span>
       </button>
     </nav>
   </div>
@@ -603,6 +1121,9 @@
   <script src="/js/servers.js"></script>
   <script src="/js/files.js"></script>
   <script src="/js/keys.js"></script>
+  <script src="/js/monitoring.js"></script>
+  <script src="/js/diagnostics.js"></script>
+  <script src="/js/loadtest.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

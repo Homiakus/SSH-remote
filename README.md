@@ -1,155 +1,195 @@
-# SSHPILOT // Next-Gen Fleet Control Plane & Terminal Hub
+# SSHPILOT // Центр управления инфраструктурой и терминальный хаб нового поколения
 
-[![Go Report Card](https://goreportcard.com/badge/sshpilot)](https://goreportcard.com)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20darwin-lightgrey)](https://github.com)
-[![Architecture](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-blue)](https://github.com)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](https://github.com)
+[![Architecture](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64-blue)](https://github.com)
+[![Design](https://img.shields.io/badge/Design-Neo--Swiss%20Editorial-d9f927)](https://github.com)
 
-**SSHPilot** is a high-performance, single-binary SSH management suite and remote infrastructure control plane. It features both an interactive **Charm Bubble Tea TUI** and a modern **Neo-Swiss Web UI** with real-time WebSocket PTY emulation, SFTP file management, SSH key vault, and multi-stage script/payload deployment pipelines.
-
----
-
-## ⚡ Key Capabilities
-
-### 🌐 Neo-Swiss Responsive Web Control Plane
-- **Fluid & Intrinsic System**: Continuous scaling via `clamp()`, container queries, and sub-pixel alignment without rigid layout breaks.
-- **Zero Horizontal Overflow**: Verified `scrollWidth === clientWidth` from ultra-compact smartphones (`320px`) to curved ultrawide monitors (`3840px`).
-- **Dynamic Viewports & Safe Areas**: Native-grade mobile ergonomics respecting `100dvh`/`100svh` and `env(safe-area-inset-*)` notches and home bars.
-- **Mobile Bottom Navigation & Off-Canvas Drawer**: Quick one-thumb switching between primary views on screens `<= 960px`.
-- **Mobile Touch Terminal Accessory Bar**: Virtual action keys (`ESC`, `TAB`, `^C`, `^Z`, `/`, `▲`, `▼`, `◀`, `▶`) sending raw ANSI codes directly to the remote PTY.
-- **Adaptive Data Views**: Seamless transformation of multi-column server/vault tables into stacked mobile cards and slide-up bottom sheets with gesture handles.
-- **Theme & Accent Architecture**: Zero-FOUC theme engine with Light / Dark modes and curated Swiss design accents (Neon Lime, Electric Amber, Hyper Cyan, Swiss Signal Red, Neutral Mono).
-
-### 💻 Dual Interface Architecture
-- **Web UI (`main.go --port 8080`)**: Zero external JavaScript runtime dependencies. Embedded static assets (`//go:embed`) with real-time WebSocket communication.
-- **Terminal TUI (`main.go --tui`)**: Built with the Charm ecosystem (`bubbletea`, `lipgloss`, `bubbles`) for headless servers, bastions, and local command-line power users.
-
-### 🛡️ Fleet Management & Remote Tooling
-- **Interactive Terminal Session**: Full VT100 / xterm-256color ANSI emulation with dynamic window resizing and bidirectional streaming over WebSockets.
-- **SFTP Remote Explorer & Inline Editor**: Directory navigation, permission inspection (`drwxr-xr-x`), file downloads, and code/config editing with instant remote sync.
-- **SSH Key Vault**: Management of Ed25519, RSA, and ECDSA keypairs with passphrases and key testing.
-- **Command Runner & Deployment Pipeline (`/` shortcut)**: 4-stage deployment orchestration (GitHub commit hash verification, payload staging, SFTP distribution, and remote execution).
+**SSHPilot** — это высокопроизводительный инструмент для управления удаленными серверами, объединяющий возможности веб-панели управления в стиле **Neo-Swiss** и терминального **TUI-интерфейса** на базе Charm Bubble Tea в едином бинарном файле без внешних зависимостей.
 
 ---
 
-## 📐 Responsive QA Matrix
+## ⚡ Ключевые возможности
 
-| Viewport | Device Class | Mode | Overflow Status | Notes |
-| :--- | :--- | :--- | :---: | :--- |
-| **320 × 568** | Extra Compact (iPhone SE 1st Gen) | Portrait | **0px (PASS)** | Uncluttered header, stacked cards, bottom bar |
-| **390 × 844** | Standard Phone (iPhone 14/15) | Portrait | **0px (PASS)** | Touch key accessory bar, bottom sheets |
-| **844 × 390** | Mobile Landscape | Landscape | **0px (PASS)** | Safe-area aware, compact headers |
-| **768 × 1024** | Tablet Portrait (iPad) | Portrait | **0px (PASS)** | Container query card distribution |
-| **1024 × 768** | Tablet Landscape | Landscape | **0px (PASS)** | Full desktop navigation bar on single row |
-| **1366 × 768** | Standard Laptop | Landscape | **0px (PASS)** | 6-column list rows with aligned action buttons |
-| **1920 × 1080** | Full HD Desktop | Landscape | **0px (PASS)** | Swiss editorial typography and grid rhythm |
-| **3440 × 1440** | Curved Ultrawide | Landscape | **0px (PASS)** | Centered max-width containment |
+```text
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                                  SSHPILOT                                   │
+ ├──────────────┬──────────────┬──────────────┬──────────────┬─────────────────┤
+ │ 01 // FLEET  │ 02 // PTY    │ 03 // RUNNER │ 04 // SFTP   │ 05 // VAULT     │
+ │ Серверы      │ Консоль      │ Скрипты      │ Файлы        │ SSH-ключи       │
+ ├──────────────┴──────────────┼──────────────┴──────────────┴─────────────────┤
+ │ 06 // MONITORING            │ 07 // DIAGNOSTICS           │ 08 // LOAD TEST │
+ │ Real-time телеметрия        │ 6-этапный аудит и логи      │ Стресс-бенчмарк │
+ └─────────────────────────────┴─────────────────────────────┴─────────────────┘
+```
+
+### 1. 🚀 Нагрузочное тестирование и стресс-бенчмарки (`08 // LOAD TEST`)
+- **Многопоточный генератор нагрузки**: от 1 до 100 параллельных воркеров с контролем RPS и таймаутами.
+- **Поддержка различных целей**:
+  - **HTTP / REST API**: тестирование веб-приложений и эндпоинтов любыми методами (`GET`, `POST`, `PUT`, `DELETE`) с кастомными телами запросов и заголовками.
+  - **SSH Connection Stress**: стресс-тестирование пула подключений, криптографических рукопожатий и лимитов демона `sshd`.
+  - **SSH Command Throughput**: замер пропускной способности параллельного выполнения команд.
+- **Высокоточная аналитика задержек**: расчет перцентилей в реальном времени ($p_{50}$, $p_{90}$, $p_{95}$, $p_{99}$, Min, Max, Avg).
+- **Живой кокпит**: графический спарклайн недавних задержек, распределение HTTP-кодов (`2xx`, `3xx`, `4xx`, `5xx`), счетчик завершенных/ошибочных запросов, кнопка экстренной остановки и экспорт отчетов в JSON.
+
+### 2. 📊 Агентлесс мониторинг серверов (`06 // MONITORING`)
+- **Сбор телеметрии без сторонних демонов**: легкий опрос по SSH через виртуальные интерфейсы ядра Linux (`/proc/stat`, `/proc/meminfo`, `/proc/net/dev`, `df`, `ps`).
+- **Ключевые метрики**: загрузка CPU %, Core Count, Load Average (1м, 5м, 15м), использование RAM и Swap, заполненность дисковых разделов (Mount points), входящий/исходящий сетевой трафик.
+- **Диспетчер процессов**: таблица активных процессов с мгновенным поиском по PID, пользователю и имени команды, а также безопасным завершением (`kill -9`).
+- **Управление службами systemd**: мониторинг статусов основных служб (`sshd`, `nginx`, `docker`, `redis`, `postgresql`, `ufw`, `fail2ban`) с кнопками перезапуска, запуска и остановки.
+- **Настраиваемый авто-опрос**: интервалы обновления 2с, 5с, 10с или ручной режим.
+
+### 3. 🩺 Диагностика, аудит соединений и логи (`07 // DIAGNOSTICS`)
+- **6-этапный диагностический аудит**:
+  1. `TCP Socket Reachability`: доступность порта и время установки TCP-соединения.
+  2. `SSH Protocol Banner`: получение версии и баннера удаленного SSH-сервера.
+  3. `Cryptographic Handshake`: проверка шифров, KEX и отпечатков ключей хоста (SHA256).
+  4. `Auth Verification`: валидация учетных данных и прав доступа.
+  5. `SFTP Subsystem`: проверка подсистемы передачи файлов.
+  6. `Latency & Jitter`: расчет дисперсии задержки.
+- **Визуализатор сетевого джиттера**: график серии из 10 контрольных пингов с расчетом джиттера ($\pm$ мс) и процента потери пакетов.
+- **Просмотрщик удаленных системных логов**: потоковое чтение `journalctl`, `/var/log/syslog`, `/var/log/auth.log` и `dmesg` с фильтрацией по уровням важности (`ERROR`, `WARN`, `INFO`) и контекстным поиском.
+- **Быстрые утилиты**: запуск в один клик `ss -tulpn` (открытые порты), `ip addr` (сетевые интерфейсы), `ip route` (маршрутизация), `df -h` (диски), `ufw status` (файрвол) и `uptime`.
+
+### 4. 💻 Терминальный эмулятор VT100 / ANSI (`02 // CONSOLE`)
+- **Полноценный 2D экранный буфер (Grid Buffer)**: поддержка экранных утилит (`htop`, `vim`, `nano`, `mc`, `less`, `top`) и альтернативного экрана (`\x1b[?1049h`).
+- **Точное позиционирование и стирание**: аппаратная поддержка `\b` (Backspace), `\r`, `\n`, `\t`, `\x1b[K` (очистка строки) и ANSI-перемещений курсора.
+- **Поддержка клавиатуры 1-в-1**: клавиши навигации, Home/End, PageUp/PageDown, функциональные клавиши `F1`–`F12`, полный набор комбинаций `Ctrl+A..Z` (`Ctrl+C`, `Ctrl+D`, `Ctrl+Z`, `Ctrl+L`, `Ctrl+W` и др.) и вставка из буфера обмена.
+- **Мобильный Touch Bar**: виртуальные клавиши управления (`ESC`, `TAB`, `^C`, `^Z`, `/`, `▲`, `▼`, `◀`, `▶`, `BKSP`) для комфортной работы со смартфонов.
+
+### 5. 🛡️ Безопасность, Vault и автоматический TOFU
+- **Шифрование Master Key (AES-256-GCM)**: пароли и приватные ключи хранятся в зашифрованных файлах `.vault`.
+- **Интеллектуальный TOFU (Trust On First Use)**: автоматическое добавление ключей новых хостов в `known_hosts` с поддержкой множественных алгоритмов (`ed25519`, `ecdsa`, `rsa`) и защитой от атак Man-in-the-Middle.
+- **Расширенный криптографический стек**: поддержка современных шифров `chacha20-poly1305`, `aes-gcm`, `curve25519-sha256` и автоматический ретрай при сетевых сбоях.
+
+### 6. 📁 SFTP-проводник и редактор файлов (`04 // FILES`)
+- Навигация по файловой системе сервера, просмотр прав доступа (`drwxr-xr-x`), скачивание и встроенный редактор текстовых файлов/конфигов с мгновенным сохранением на сервере.
 
 ---
 
-## 🚀 Quick Start
+## 🎨 Веб-интерфейс Neo-Swiss
 
-### Prerequisites
-- [Go 1.22+](https://go.dev/dl/) installed.
+- **Адаптивность от 320px до 4K/Ultrawide**: строгая верстка без горизонтального скролла (`scrollWidth === clientWidth`).
+- **Эргономика Safe Area**: учет вырезов экранов смартфонов (`100dvh`, `env(safe-area-inset-*)`).
+- **Цветовые схемы и акценты**: темная и светлая темы с швейцарскими палитрами (**Neon Lime**, **Electric Amber**, **Hyper Cyan**, **Swiss Signal Red**, **Neutral Mono**).
+- **Встроенные ассеты (`//go:embed`)**: веб-интерфейс компилируется внутрь бинарника и не требует установки Node.js/npm.
 
-### Run Directly
+---
+
+## 🚀 Быстрый старт
+
+### Требования
+- Установленный [Go 1.22+](https://go.dev/dl/) (для сборки из исходников).
+
+### Запуск
 ```bash
-# Clone the repository
+# Клонирование репозитория
 git clone https://github.com/Homiakus/SSH-remote.git
 cd SSH-remote
 
-# Run Web Control Plane (Default on http://127.0.0.1:8080)
+# Запуск веб-панели (по умолчанию http://127.0.0.1:8080)
 go run main.go
 
-# Or run in headless TUI mode
+# Или запуск в режиме TUI-терминала
 go run main.go --tui
 ```
 
-### CLI Flags
+### Флаги командной строки
 ```text
-Usage of sshpilot:
-  --host string      Web server host (default "127.0.0.1")
-  --port string      Web server port (default "8080")
-  --no-browser       Do not automatically open browser on startup
-  --tui              Launch legacy Charm Bubble Tea TUI interface
+Использование sshpilot:
+  --host string      Хост веб-сервера (по умолчанию "127.0.0.1")
+  --port string      Порт веб-сервера (по умолчанию "8080")
+  --no-browser       Не открывать браузер автоматически при старте
+  --tui              Запустить TUI-интерфейс Charm Bubble Tea
 ```
 
 ---
 
-## 🔨 Building & Cross-Compilation
+## 🔨 Сборка и компиляция
 
-Use the built-in PowerShell build system `build.ps1` for cross-platform binaries:
+Для сборки кросс-платформенных бинарников используйте скрипт `build.ps1`:
 
 ```powershell
-# Build for current operating system & architecture
+# Сборка под текущую ОС и архитектуру (создаст dist/sshpilot.exe)
 .\build.ps1 -Target current
 
-# Build for all supported platforms (Windows, Linux, macOS - x64 & ARM64)
+# Сборка под все платформы (Windows, Linux, macOS на amd64 и arm64)
 .\build.ps1 -Target all
 ```
 
-Or build manually using standard Go tooling:
+Или соберите напрямую через Go CLI:
 ```bash
-# Build standalone binary
 go build -trimpath -ldflags="-s -w" -o sshpilot.exe .
 ```
 
-All compiled binaries are placed into the `dist/` directory.
-
 ---
 
-## ⌨️ Global Keyboard Shortcuts
+## ⌨️ Горячие клавиши
 
-| Shortcut | Scope | Action |
+| Клавиша | Область | Действие |
 | :--- | :--- | :--- |
-| `/` | Global | Open Quick Command Runner & Deployment Palette |
-| `ESC` | Modals / Palette | Close active dialog / modal bottom sheet |
-| `Ctrl + C` | Terminal | Send SIGINT interrupt to remote process |
-| `Ctrl + Z` | Terminal | Send SIGTSTP suspend signal |
-| `TAB` | Terminal | Trigger remote shell auto-completion |
+| `/` или `Alt + /` | Глобально | Открыть палитру быстрого запуска команд и скриптов |
+| `ESC` | Модальные окна | Закрыть текущее диалоговое окно / шторку |
+| `Ctrl + C` | Терминал | Отправить сигнал прерывания SIGINT |
+| `Ctrl + Z` | Терминал | Отправить сигнал приостановки SIGTSTP |
+| `Ctrl + L` | Терминал | Очистить экран терминала |
+| `TAB` | Терминал | Автодополнение команд в shell |
+| `Стрелки` | Терминал | Навигация по строке ввода и истории команд |
 
 ---
 
-## 📡 REST API Reference
+## 📡 REST API
 
-| Endpoint | Method | Description |
+| Эндпоинт | Метод | Описание |
 | :--- | :---: | :--- |
-| `/api/servers` | `GET`, `POST` | List configured server nodes / Add new node |
-| `/api/servers/{name}` | `GET`, `DELETE` | Inspect node telemetry / Remove node |
-| `/api/servers/{name}/test` | `POST` | Execute live SSH handshake and latency ping |
-| `/api/keys` | `GET`, `POST` | List SSH key vault / Register new keypair |
-| `/api/fs/list?server={name}&path={p}` | `GET` | Retrieve SFTP directory contents |
-| `/api/fs/read?server={name}&path={p}` | `GET` | Read remote file content |
-| `/api/fs/write` | `POST` | Save edited file content to remote server |
-| `/api/scripts` | `GET`, `POST` | Manage runnable automation scripts |
-| `/api/scripts/execute` | `POST` | Trigger multi-stage execution pipeline |
-| `/ws/terminal` | `WS` | Real-time bidirectional PTY stream |
+| `/api/servers` | `GET`, `POST` | Список серверов / добавление нового сервера |
+| `/api/servers/{name}` | `GET`, `DELETE` | Получение настроек / удаление сервера |
+| `/api/servers/{name}/test` | `POST` | Тест SSH-соединения и замер задержки |
+| `/api/servers/{name}/metrics` | `GET` | Получение текущей телеметрии (CPU, RAM, Disks, Net, процессы, службы) |
+| `/api/servers/{name}/process/kill` | `POST` | Завершение процесса (`PID`, `Signal`) |
+| `/api/servers/{name}/service/action`| `POST` | Управление службой systemd (`start`, `stop`, `restart`) |
+| `/api/servers/{name}/diagnostics/run` | `POST` | Запуск 6-этапного аудита хоста |
+| `/api/servers/{name}/diagnostics/ping`| `POST` | Замер сетевого джиттера (10 пингов) |
+| `/api/servers/{name}/diagnostics/logs`| `GET` | Чтение системных логов (`journalctl`, `syslog`, `auth`, `dmesg`) |
+| `/api/servers/{name}/diagnostics/exec`| `POST` | Выполнение диагностических утилит |
+| `/api/loadtest/start` | `POST` | Запуск стресс-тестирования (HTTP / SSH Connect / SSH Command) |
+| `/api/loadtest/status` | `GET` | Получение live-метрик текущего теста |
+| `/api/loadtest/stop` | `POST` | Остановка текущего теста |
+| `/api/loadtest/history` | `GET` | История и отчеты проведенных тестов |
+| `/api/keys` | `GET`, `POST` | Список и генерация SSH-ключей |
+| `/api/fs/list` | `GET` | Просмотр каталогов SFTP |
+| `/api/fs/read`, `/api/fs/write` | `GET`, `POST` | Чтение и сохранение файлов по SFTP |
+| `/ws/terminal` | `WS` | Интерактивный WebSocket-канал терминала PTY |
 
 ---
 
-## 📂 Project Architecture
+## 📂 Структура проекта
 
 ```text
 ssh-console/
-├── main.go                     # Application entry point & CLI flags
-├── build.ps1                   # Cross-platform multi-arch build automation
+├── main.go                     # Точка входа в приложение и флаги CLI
+├── build.ps1                   # Скрипт кросс-платформенной сборки
 ├── internal/
-│   ├── config/                 # Host configurations, serialization & storage
-│   ├── log/                    # Audit logging & trace collection
-│   ├── scripts/                # Automated script executor & pipeline stages
-│   ├── ssh/                    # SSH client, PTY allocators & SFTP subsystem
-│   ├── ui/                     # Charm Bubble Tea TUI components & themes
-│   └── web/                    # HTTP router, API handlers & WebSocket hub
-│       ├── handlers/           # REST endpoints & PTY websocket handlers
-│       └── static/             # Embedded HTML/CSS/JS web assets
-│           ├── index.html      # Responsive Single-Page Application
-│           ├── css/app.css     # Fluid Neo-Swiss design system
-│           └── js/             # Modular vanilla controllers
-└── scripts/                    # Helper utilities & site-admin automation
+│   ├── config/                 # Конфигурации серверов, Master Key и AES-256 Vault
+│   ├── diagnostics/            # Движок 6-этапного аудита, джиттера и чтения логов
+│   ├── loadtest/               # Движок нагрузочного тестирования и перцентилей
+│   ├── monitoring/             # Агентлесс коллектор телеметрии, процессов и служб
+│   ├── log/                    # Логирование и аудит
+│   ├── scripts/                # Автоматизация и пайплайны развертывания
+│   ├── ssh/                    # SSH-клиент, TOFU known_hosts, ключи, PTY и SFTP
+│   ├── ui/                     # Charm Bubble Tea TUI (компоненты и экраны)
+│   └── web/                    # HTTP-сервер, REST API и WebSocket
+│       ├── handlers/           # Обработчики эндпоинтов API и терминала
+│       └── static/             # Встроенные веб-ассеты (Single Page App)
+│           ├── index.html      # Разметка Neo-Swiss панели
+│           ├── css/app.css     # Адаптивная дизайн-система
+│           └── js/             # Модульные контроллеры (терминал, мониторинг, тесты)
+└── servers/                    # Хранилище зашифрованных серверов (.vault) и known_hosts
 ```
 
 ---
 
-## 📄 License
+## 📄 Лицензия
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+Проект распространяется под лицензией [MIT](LICENSE).

@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"strings"
 	"testing"
 )
 
@@ -43,20 +41,8 @@ func TestSecretWarningsUsesPassphraseForKeyAuth(t *testing.T) {
 }
 
 func TestSaveAndLoadServerPreservesQuotedPasswordWhitespace(t *testing.T) {
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(origWD); err != nil {
-			t.Fatalf("restore wd: %v", err)
-		}
-	})
+	cleanup := setupVaultTestDir(t)
+	defer cleanup()
 
 	cfg := &ServerConfig{
 		Host:       "185.72.144.39",
@@ -76,14 +62,6 @@ func TestSaveAndLoadServerPreservesQuotedPasswordWhitespace(t *testing.T) {
 
 	if loaded.Password != "secret " {
 		t.Fatalf("expected password with trailing space, got %q", loaded.Password)
-	}
-
-	raw, err := os.ReadFile("servers/quoted.env")
-	if err != nil {
-		t.Fatalf("read saved env: %v", err)
-	}
-	if !strings.Contains(string(raw), "SSH_PASSWORD=\"secret \"") {
-		t.Fatalf("saved env does not preserve quoted password whitespace:\n%s", string(raw))
 	}
 }
 
