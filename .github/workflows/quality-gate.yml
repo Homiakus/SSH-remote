@@ -18,7 +18,7 @@ jobs:
   go-quality:
     name: Go quality
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -32,8 +32,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Download modules
-        run: go mod download
+      - name: Normalize module graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod tidy
+          git diff -- go.mod go.sum | tee module-tidy.diff
 
       - name: Formatting ratchet
         shell: bash
@@ -64,8 +68,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Deterministic tests
-        run: go test -count=1 ./...
+      - name: Deterministic tests and coverage baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -coverprofile=coverage.out ./... | tee package-coverage.txt
+          go tool cover -func=coverage.out | tee coverage-functions.txt
 
       - name: Race detector
         run: go test -race -count=1 ./...
@@ -78,6 +86,30 @@ jobs:
 
       - name: Vulnerability analysis
         run: govulncheck ./...
+
+      - name: Upload quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-${{ github.run_id }}
+          path: |
+            coverage.out
+            package-coverage.txt
+            coverage-functions.txt
+            module-tidy.diff
+            go.mod
+            go.sum
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Module hygiene gate
+        shell: bash
+        run: |
+          if [[ -s module-tidy.diff ]]; then
+            echo "go mod tidy changes are required and must be committed:"
+            cat module-tidy.diff
+            exit 1
+          fi
 
   cross-build:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
