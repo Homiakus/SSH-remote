@@ -17,7 +17,6 @@ class SSHPilotTerminal {
     this.cursorY = 0;
     this.savedCursor = { x: 0, y: 0 };
     this.showCursor = true;
-    this.cursorBlink = true;
 
     // Screen buffer & styles
     this.lines = [];
@@ -63,7 +62,7 @@ class SSHPilotTerminal {
     `;
     this.termElem.tabIndex = 0;
 
-    // Hidden input helper for reliable mobile keyboard and focus handling
+    // Hidden input helper for mobile virtual keyboards
     this.inputHelper = document.createElement('textarea');
     this.inputHelper.style.cssText = `
       position: absolute;
@@ -84,18 +83,31 @@ class SSHPilotTerminal {
 
     // Focus bindings
     this.termElem.addEventListener('click', () => {
-      this.inputHelper.focus();
       this.termElem.focus();
     });
 
     // Keyboard Input
     this.termElem.addEventListener('keydown', (e) => this.handleKeyDown(e));
     this.inputHelper.addEventListener('keydown', (e) => this.handleKeyDown(e));
-    this.inputHelper.addEventListener('input', (e) => {
-      if (e.data && this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(e.data);
+
+    // Global keydown routing when Console view is active
+    window.addEventListener('keydown', (e) => {
+      const consoleView = document.getElementById('view-console');
+      if (!consoleView || !consoleView.classList.contains('active')) return;
+
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        if (active !== this.inputHelper && active !== this.termElem) return;
       }
-      this.inputHelper.value = '';
+
+      // Check if modal is open
+      const openModal = document.querySelector('.modal-overlay.active');
+      if (openModal) return;
+
+      if (active !== this.termElem) {
+        this.termElem.focus();
+        this.handleKeyDown(e);
+      }
     });
 
     // Paste handling
@@ -107,9 +119,8 @@ class SSHPilotTerminal {
       }
     };
     this.termElem.addEventListener('paste', handlePaste);
-    this.inputHelper.addEventListener('paste', handlePaste);
 
-    // Resize listener with debounce
+    // Resize listener
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
@@ -190,9 +201,7 @@ class SSHPilotTerminal {
     };
   }
 
-  // --- Keyboard Handling ---
   handleKeyDown(e) {
-    // Intercept '/' key for Slash Runner if explicitly triggered with Alt+/
     if (e.key === '/' && e.altKey) {
       if (window.SSHPilotSlashRunner) {
         window.SSHPilotSlashRunner.openPalette();
@@ -308,7 +317,6 @@ class SSHPilotTerminal {
     this.resetScreen();
   }
 
-  // --- VT100 / ANSI Stream Processing ---
   write(str) {
     let i = 0;
     const len = str.length;
@@ -418,7 +426,6 @@ class SSHPilotTerminal {
     while (this.lines.length <= y) {
       this.lines.push([]);
     }
-    // Limit scrollback
     if (this.lines.length > this.maxScrollback) {
       const diff = this.lines.length - this.maxScrollback;
       this.lines.splice(0, diff);
@@ -443,7 +450,6 @@ class SSHPilotTerminal {
     };
   }
 
-  // --- CSI Command Parser ---
   handleCSI(cmd, paramStr) {
     const isPrivate = paramStr.startsWith('?');
     const cleanParams = isPrivate ? paramStr.slice(1) : paramStr;
@@ -452,33 +458,22 @@ class SSHPilotTerminal {
     const p2 = parts[1] !== undefined && !isNaN(parts[1]) ? parts[1] : 1;
 
     switch (cmd) {
-      // SGR (Select Graphic Rendition) - Colors & Attributes
       case 'm':
         this.handleSGR(parts);
         break;
-
-      // Cursor Up: \x1b[A
       case 'A':
         this.cursorY = Math.max(0, this.cursorY - p1);
         break;
-
-      // Cursor Down: \x1b[B
       case 'B':
         this.cursorY = this.cursorY + p1;
         this.ensureLineExists(this.cursorY);
         break;
-
-      // Cursor Forward: \x1b[C
       case 'C':
         this.cursorX = Math.min(this.cols - 1, this.cursorX + p1);
         break;
-
-      // Cursor Backward: \x1b[D
       case 'D':
         this.cursorX = Math.max(0, this.cursorX - p1);
         break;
-
-      // Cursor Position: \x1b[row;colH or \x1b[row;colf
       case 'H':
       case 'f': {
         const targetRow = Math.max(0, p1 - 1);
@@ -488,38 +483,29 @@ class SSHPilotTerminal {
         this.ensureLineExists(this.cursorY);
         break;
       }
-
-      // Erase in Line: \x1b[K
       case 'K': {
         const mode = parts[0] || 0;
         this.ensureLineExists(this.cursorY);
         const line = this.lines[this.cursorY];
         if (mode === 0) {
-          // Erase from cursor to end of line
           line.length = Math.min(line.length, this.cursorX);
         } else if (mode === 1) {
-          // Erase from start to cursor
           for (let c = 0; c <= Math.min(this.cursorX, line.length - 1); c++) {
             line[c] = { char: ' ', fg: null, bg: null };
           }
         } else if (mode === 2) {
-          // Erase entire line
           line.length = 0;
         }
         break;
       }
-
-      // Erase in Display: \x1b[J
       case 'J': {
         const mode = parts[0] || 0;
         if (mode === 0) {
-          // Clear from cursor to end
           if (this.lines[this.cursorY]) {
             this.lines[this.cursorY].length = Math.min(this.lines[this.cursorY].length, this.cursorX);
           }
           this.lines.length = this.cursorY + 1;
         } else if (mode === 2 || mode === 3) {
-          // Clear entire screen
           this.lines = [];
           for (let r = 0; r < this.rows; r++) this.lines.push([]);
           this.cursorX = 0;
@@ -527,8 +513,6 @@ class SSHPilotTerminal {
         }
         break;
       }
-
-      // Show / Hide Cursor / Alternate Screen Buffer: \x1b[?25h, \x1b[?1049h
       case 'h':
         if (isPrivate) {
           if (p1 === 25) this.showCursor = true;
@@ -543,7 +527,6 @@ class SSHPilotTerminal {
           }
         }
         break;
-
       case 'l':
         if (isPrivate) {
           if (p1 === 25) this.showCursor = false;
@@ -555,21 +538,15 @@ class SSHPilotTerminal {
           }
         }
         break;
-
-      // Cursor Horizontal Absolute: \x1b[G
       case 'G':
         this.cursorX = Math.max(0, Math.min(this.cols - 1, p1 - 1));
         break;
-
-      // Delete Characters at cursor: \x1b[P
       case 'P': {
         this.ensureLineExists(this.cursorY);
         const line = this.lines[this.cursorY];
         line.splice(this.cursorX, p1);
         break;
       }
-
-      // Insert blank characters: \x1b[@
       case '@': {
         this.ensureLineExists(this.cursorY);
         const line = this.lines[this.cursorY];
@@ -716,7 +693,6 @@ class SSHPilotTerminal {
         }
       }
 
-      // If cursor is at the end of this line
       if (this.showCursor && y === this.cursorY && this.cursorX >= lineLen) {
         lineHtml += `<span class="term-cursor" style="background:var(--accent,#d9f927);color:#000;font-weight:700;">&nbsp;</span>`;
       }
@@ -730,4 +706,3 @@ class SSHPilotTerminal {
 }
 
 window.SSHPilotTerminal = SSHPilotTerminal;
-
