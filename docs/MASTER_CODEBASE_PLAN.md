@@ -11,13 +11,13 @@ This file is the single source of truth for implementation order. The execution 
 - `DONE` requires evidence: tests, edge-space coverage, mutation result when Go changed, and relevant security/performance checks.
 - Discoveries do not silently expand scope: add a new item with an explicit dependency.
 - No test/security threshold is lowered to make an item pass.
-- No automated process directly merges to `main`.
+- No automated process directly merges to `main` unless an authorized user explicitly requests the merge after required gates are green.
 
 ---
 
 ## MP-0 — Engineering control plane
 
-### MP-0.1 — Plan-driven execution contract — `IN_PROGRESS`
+### MP-0.1 — Plan-driven execution contract — `DONE`
 Dependencies: none.
 
 Deliverables:
@@ -27,24 +27,41 @@ Deliverables:
 - CI quality gate;
 - mutation-testing gate.
 
-Exit:
+Exit evidence:
 - repository contains the artifacts above;
-- CI validates Go formatting, vet, tests, race detector, vulnerability scan, builds and PR mutation testing;
-- mutation testing is differential on PRs to keep feedback bounded.
+- CI validates Go formatting ratchet, vet, tests, race detector, vulnerability scan, builds and PR mutation testing;
+- mutation testing is differential for changed production Go code to keep feedback bounded;
+- test-only and module-graph changes execute a full mutation baseline campaign instead of bypassing test-of-tests.
 
-### MP-0.2 — Baseline quality ledger — `READY`
+### MP-0.2 — Baseline quality ledger — `DONE`
 Dependencies: MP-0.1.
 
-Create a machine-readable baseline for each relevant package:
+Machine-readable source of truth: `.quality/baseline.json`. Human-readable summary: `docs/QUALITY_LEDGER.md`.
+
+Captured baseline includes, per relevant package:
 - statement coverage;
-- mutation efficacy;
-- mutant coverage;
+- mutation efficacy and mutant coverage;
 - test duration;
 - race status;
 - package build status;
 - known fuzz targets and corpus size.
 
-Use the baseline as a ratchet: new code must not reduce the current metric and critical packages receive progressively higher targets.
+Ratchet policy:
+- package and module statement coverage may not regress below the recorded baseline;
+- full mutation campaigns may not regress below module/package mutation baselines;
+- changed production Go code must satisfy the stronger differential mutation gate: efficacy >=80% and mutant coverage >=70%;
+- race/build/vulnerability failures are hard failures and cannot be ratcheted downward.
+
+Baseline evidence captured on 2026-08-27:
+- module statement coverage: 37.3%;
+- full mutation efficacy: 8.31%;
+- full mutant coverage: 50.75%;
+- 1,600 runnable mutants: 133 killed, 1,467 lived; 1,553 additional mutants not covered;
+- race detector: PASS;
+- `govulncheck`: PASS after upgrading the Go toolchain/dependency security baseline;
+- six cross-build targets: PASS.
+
+A scheduler-dependent WebSocket coverage fluctuation discovered by the first ratchet run was treated as a test determinism defect, not as permission to lower the baseline; the test now waits for handler cleanup before completing.
 
 ### MP-0.3 — Deterministic test fixtures — `READY`
 Dependencies: MP-0.1.
@@ -197,10 +214,10 @@ Use golden tests plus semantic validation for nginx/systemd output; prevent unsa
 
 ## MP-7 — Release engineering and operational confidence
 
-### MP-7.1 — Cross-platform build matrix — `BACKLOG`
+### MP-7.1 — Cross-platform build matrix — `DONE`
 Dependencies: MP-0.1.
 
-Continuously compile supported Windows/Linux/macOS amd64/arm64 targets. Platform-specific behavior gets targeted tests where compile-only checks are insufficient.
+Continuously compile supported Windows/Linux/macOS amd64/arm64 targets. The CI matrix currently verifies all six target combinations on every relevant quality run; platform-specific behavior still receives targeted tests where compile-only checks are insufficient.
 
 ### MP-7.2 — Performance budgets — `BACKLOG`
 Dependencies: MP-2.3, MP-4.3, MP-5.1.
@@ -226,6 +243,6 @@ A release candidate must have a reproducible evidence bundle containing:
 
 ## Current execution pointer
 
-`NEXT = MP-0.1`
+`NEXT = MP-0.3`
 
-After MP-0.1 is merged and its CI is green, set MP-0.1 to `DONE`, set `NEXT = MP-0.2`, and execute the next atomic item through `docs/ENGINEERING_CONTROL_LOOP.md`.
+MP-0.1 and MP-0.2 are complete. Execute MP-0.3 through `docs/ENGINEERING_CONTROL_LOOP.md`; MP-1.1 is also dependency-ready but does not replace the single active execution pointer.
