@@ -75,6 +75,13 @@ jobs:
           go test -count=1 -coverprofile=coverage.out ./... | tee package-coverage.txt
           go tool cover -func=coverage.out | tee coverage-functions.txt
 
+      - name: Coverage ratchet
+        run: |
+          python3 .quality/check_coverage_ratchet.py \
+            --baseline .quality/baseline.json \
+            --packages package-coverage.txt \
+            --functions coverage-functions.txt
+
       - name: Race detector
         run: go test -race -count=1 ./...
 
