@@ -1,0 +1,40 @@
+silent: false
+
+unleash:
+  integration: false
+  dry-run: false
+  tags: ""
+  output: "mutation-report.json"
+  diff: ""
+  output-statuses: "lctv"
+  workers: 2
+  test-cpu: 1
+  timeout-coefficient: 3
+  threshold:
+    efficacy: 80
+    mutant-coverage: 70
+  exclude-files: []
+
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: true
+  invert-bitwise:
+    enabled: true
+  invert-bwassign:
+    enabled: true
+  invert-negatives:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: true
+  remove-self-assignments:
+    enabled: true
