@@ -1,8 +1,47 @@
 # ==============================================================================
-# SSHPILOT // .gitignore
+# SSHPILOT // .gitignore (Zero-Data-Leak Hardened)
 # ==============================================================================
 
-# Binaries & Build Artifacts
+# ------------------------------------------------------------------------------
+# 1. Server Vaults, Secrets, Master Keys & Runtime Data (CRITICAL - NEVER COMMIT)
+# ------------------------------------------------------------------------------
+servers/
+*/servers/
+**/servers/
+**/.master_key*
+**/*.vault
+**/*.vault.*
+**/known_hosts*
+**/*.env
+**/*.env.*
+!**/.env.example
+.sshpilot/
+**/.sshpilot/
+
+# ------------------------------------------------------------------------------
+# 2. SSH Keys, Certificates & Keypairs (CRITICAL - NEVER COMMIT)
+# ------------------------------------------------------------------------------
+keys/*
+!keys/.gitkeep
+*/keys/*
+!*/keys/.gitkeep
+**/*.ed25519
+**/*.ed25519.pub
+**/*.rsa
+**/*.rsa.pub
+**/*.ecdsa
+**/*.ecdsa.pub
+**/*.dsa
+**/*.pem
+**/*.key
+**/*.ppk
+**/id_rsa*
+**/id_ed25519*
+**/id_ecdsa*
+
+# ------------------------------------------------------------------------------
+# 3. Binaries, Compiled Executables & Distribution Artifacts
+# ------------------------------------------------------------------------------
 *.exe
 *.exe~
 *.dll
@@ -14,40 +53,42 @@ dist/
 build/
 bin/
 sshpilot
-sshpilot-linux-*
-sshpilot-darwin-*
-sshpilot-windows-*
+sshpilot-*
 
-# Go Build & Dependency Cache
+# ------------------------------------------------------------------------------
+# 4. Go Build, Test & Dependency Cache
+# ------------------------------------------------------------------------------
 .gocache/
 vendor/
 *.coverprofile
 coverage.out
 coverage.html
 
-# Runtime Secrets, Host Keys & User Data
-servers/
-keys/*.ed25519
-keys/*.rsa
-keys/*.ecdsa
-keys/*.dsa
-keys/*.pem
-keys/*.key
-!keys/.gitkeep
-.env
-.env.*
-!.env.example
+# ------------------------------------------------------------------------------
+# 5. Logs, Dumps, Benchmarks & Temporary Files
+# ------------------------------------------------------------------------------
+*.log
+**/*.log
+scratch/
+tmp/
+temp/
+*.dump
+*.trace
+loadtest-report-*.json
 
-# Playwright & Browser Automation Artifacts
+# ------------------------------------------------------------------------------
+# 6. Playwright & Browser Automation Artifacts
+# ------------------------------------------------------------------------------
 .playwright-mcp/
 test-results/
 playwright-report/
 screenshots/
-*.png
 *.webm
 *.webp
 
-# IDEs & Editor Configuration
+# ------------------------------------------------------------------------------
+# 7. IDEs, Editors & OS Files
+# ------------------------------------------------------------------------------
 .idea/
 .vscode/
 *.swp
@@ -55,8 +96,6 @@ screenshots/
 *~
 *.sublime-project
 *.sublime-workspace
-
-# Operating System Files
 .DS_Store
 .DS_Store?
 ._*
@@ -65,10 +104,3 @@ screenshots/
 ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
-
-# Audit Logs & Temp Files
-.sshpilot/
-*.log
-scratch/
-tmp/
-temp/
