@@ -43,24 +43,23 @@ func main() {
 		return
 	}
 
-	addr := fmt.Sprintf("%s:%s", *host, *port)
-	url := fmt.Sprintf("http://%s", addr)
+	err := web.StartServerWithGracefulShutdown(*host, *port, func(url string) {
+		fmt.Println("==================================================================")
+		fmt.Println("  SSHPILOT // CONTROL PLANE (NEO-SWISS EDITORIAL SYSTEM)")
+		fmt.Println("==================================================================")
+		fmt.Printf("  • Local Web UI : %s\n", url)
+		fmt.Println("  • Press Ctrl+C to terminate server")
+		fmt.Println("==================================================================")
 
-	fmt.Println("==================================================================")
-	fmt.Println("  SSHPILOT // CONTROL PLANE (NEO-SWISS EDITORIAL SYSTEM)")
-	fmt.Println("==================================================================")
-	fmt.Printf("  • Local Web UI : %s\n", url)
-	fmt.Println("  • Press Ctrl+C to terminate server")
-	fmt.Println("==================================================================")
+		if !*noBrowser {
+			go func() {
+				time.Sleep(200 * time.Millisecond)
+				openBrowser(url)
+			}()
+		}
+	})
 
-	if !*noBrowser {
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			openBrowser(url)
-		}()
-	}
-
-	if err := web.StartServer(addr); err != nil {
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)
 	}
