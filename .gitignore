@@ -1,0 +1,74 @@
+# ==============================================================================
+# SSHPILOT // .gitignore
+# ==============================================================================
+
+# Binaries & Build Artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+dist/
+build/
+bin/
+sshpilot
+sshpilot-linux-*
+sshpilot-darwin-*
+sshpilot-windows-*
+
+# Go Build & Dependency Cache
+.gocache/
+vendor/
+*.coverprofile
+coverage.out
+coverage.html
+
+# Runtime Secrets, Host Keys & User Data
+servers/
+keys/*.ed25519
+keys/*.rsa
+keys/*.ecdsa
+keys/*.dsa
+keys/*.pem
+keys/*.key
+!keys/.gitkeep
+.env
+.env.*
+!.env.example
+
+# Playwright & Browser Automation Artifacts
+.playwright-mcp/
+test-results/
+playwright-report/
+screenshots/
+*.png
+*.webm
+*.webp
+
+# IDEs & Editor Configuration
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Audit Logs & Temp Files
+.sshpilot/
+*.log
+scratch/
+tmp/
+temp/

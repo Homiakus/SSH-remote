@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-density="comfortable" data-motion="system">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSHPILOT // Control Plane</title>
+  <link rel="icon" href="data:,">
+  
+  <!-- Instant Zero-FOUC Theme & Accent Initializer -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('sshpilot_theme') || 'system';
+        var isDark = savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        
+        var savedAccent = localStorage.getItem('sshpilot_accent');
+        if (savedAccent) {
+          document.documentElement.style.setProperty('--accent-base', savedAccent);
+        }
+        var savedDensity = localStorage.getItem('sshpilot_density') || 'comfortable';
+        document.documentElement.setAttribute('data-density', savedDensity);
+        
+        var savedMotion = localStorage.getItem('sshpilot_motion') || 'system';
+        document.documentElement.setAttribute('data-motion', savedMotion);
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <!-- SVG Icon Definitions Library -->
+  <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+      <line x1="6" y1="6" x2="6.01" y2="6"></line>
+      <line x1="6" y1="18" x2="6.01" y2="18"></line>
+    </symbol>
+    <symbol id="icon-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="4 17 10 11 4 5"></polyline>
+      <line x1="12" y1="19" x2="20" y2="19"></line>
+    </symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+    </symbol>
+    <symbol id="icon-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+    </symbol>
+    <symbol id="icon-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 2l-2 2m-1.5 1.5L14 9l-3 3-2-2-4 4 3 3 6-6 3.5-3.5M21 2a2.8 2.8 0 1 0-4 4"></path>
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </symbol>
+    <symbol id="icon-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </symbol>
+    <symbol id="icon-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+    </symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </symbol>
+  </svg>
+
+  <!-- Mobile Navigation Drawer Overlay -->
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <aside id="mobile-nav-drawer" class="mobile-nav-drawer" aria-label="Mobile Navigation">
+    <div class="mobile-drawer-header">
+      <div class="brand-section">
+        <span class="brand-title">
+          <svg class="brand-icon"><use href="#icon-activity"></use></svg>
+          SSHPilot
+        </span>
+      </div>
+      <button id="btn-close-mobile-nav" class="btn-icon-nav" aria-label="Close Navigation">
+        <svg style="width: 16px; height: 16px;"><use href="#icon-close"></use></svg>
+      </button>
+    </div>
+    <div class="mobile-drawer-body">
+      <nav class="mobile-nav-list">
+        <button class="mobile-nav-item active" data-view="servers">
+          <svg class="tab-icon"><use href="#icon-server"></use></svg>
+          <span>01 // FLEET SERVERS</span>
+        </button>
+        <button class="mobile-nav-item" data-view="console">
+          <svg class="tab-icon"><use href="#icon-terminal"></use></svg>
+          <span>02 // TERMINAL CONSOLE</span>
+        </button>
+        <button class="mobile-nav-item" data-view="scripts">
+          <svg class="tab-icon"><use href="#icon-play"></use></svg>
+          <span>03 // RUNNABLE SCRIPTS</span>
+        </button>
+        <button class="mobile-nav-item" data-view="files">
+          <svg class="tab-icon"><use href="#icon-folder"></use></svg>
+          <span>04 // SFTP FILESYSTEM</span>
+        </button>
+        <button class="mobile-nav-item" data-view="keys">
+          <svg class="tab-icon"><use href="#icon-key"></use></svg>
+          <span>05 // SSH KEY VAULT</span>
+        </button>
+      </nav>
+      <div class="mobile-drawer-footer">
+        <button id="btn-open-appearance-mobile" class="btn-swiss" style="width: 100%; justify-content: center; gap: 0.75rem;">
+          <svg style="width: 16px; height: 16px;"><use href="#icon-palette"></use></svg>
+          <span>THEME & ACCENT SETTINGS</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <button id="btn-mobile-menu" class="btn-icon-nav mobile-menu-toggle" aria-label="Open Navigation Menu">
+          <svg style="width: 18px; height: 18px;"><use href="#icon-menu"></use></svg>
+        </button>
+        <span class="brand-title">
+          <svg class="brand-icon"><use href="#icon-activity"></use></svg>
+          SSHPilot
+        </span>
+        <span class="micro-label brand-meta">CONTROL // v2.5</span>
+      </div>
+
+      <nav class="main-nav" aria-label="Main Navigation">
+        <button class="nav-tab active" data-view="servers" id="nav-btn-servers">
+          <svg class="tab-icon"><use href="#icon-server"></use></svg>
+          <span class="tab-index">01</span> SERVERS
+        </button>
+        <button class="nav-tab" data-view="console" id="nav-btn-console">
+          <svg class="tab-icon"><use href="#icon-terminal"></use></svg>
+          <span class="tab-index">02</span> CONSOLE
+        </button>
+        <button class="nav-tab" data-view="scripts" id="nav-btn-scripts">
+          <svg class="tab-icon"><use href="#icon-play"></use></svg>
+          <span class="tab-index">03</span> RUNNABLES
+        </button>
+        <button class="nav-tab" data-view="files" id="nav-btn-files">
+          <svg class="tab-icon"><use href="#icon-folder"></use></svg>
+          <span class="tab-index">04</span> FILESYSTEM
+        </button>
+        <button class="nav-tab" data-view="keys" id="nav-btn-keys">
+          <svg class="tab-icon"><use href="#icon-key"></use></svg>
+          <span class="tab-index">05</span> SSH KEYS
+        </button>
+      </nav>
+
+      <div class="header-status">
+        <div id="active-server-badge" class="active-server-badge" title="Current Active Node">
+          <span class="status-dot" id="server-status-dot"></span>
+          <span id="active-server-name" class="mono">NO SERVER SELECTED</span>
+        </div>
+        <button id="btn-open-appearance" class="btn-icon-nav" title="Appearance Settings (Theme & Accent)">
+          <svg style="width: 16px; height: 16px;"><use href="#icon-palette"></use></svg>
+        </button>
+        <span id="live-clock" class="mono micro-label">--:--:--</span>
+      </div>
+    </header>
+
+    <!-- SECTION 01: SERVERS -->
+    <main id="view-servers" class="view-panel active">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">01 // FLEET ARCHITECTURE</span>
+          <h1 class="chapter-title">Configured Nodes</h1>
+          <p class="chapter-desc">Managed infrastructure endpoints, cryptographic credentials, and real-time connectivity telemetry.</p>
+        </div>
+        <div class="chapter-actions">
+          <button id="btn-add-server" class="btn-swiss primary">+ ADD SERVER</button>
+        </div>
+      </section>
+
+      <div id="servers-list-container" class="editorial-list">
+        <!-- Loaded via JS -->
+      </div>
+    </main>
+
+    <!-- SECTION 02: WEB CONSOLE -->
+    <main id="view-console" class="view-panel">
+      <div class="terminal-layout">
+        <div class="terminal-toolbar">
+          <div class="terminal-toolbar-left">
+            <span class="micro-label term-session-tag">ACTIVE PTY SESSION</span>
+            <button id="btn-trigger-slash" class="slash-shortcut-pill" title="Open / Command Palette">
+              <span class="slash-key">/</span> <span class="slash-label">RUNNABLE</span>
+            </button>
+          </div>
+          <div class="terminal-toolbar-right">
+            <button id="btn-term-clear" class="btn-swiss sm">CLEAR</button>
+            <button id="btn-term-reconnect" class="btn-swiss sm">RECONNECT</button>
+          </div>
+        </div>
+
+        <div id="terminal-wrapper" class="terminal-container">
+          <!-- Xterm instance attaches here -->
+        </div>
+
+        <!-- Mobile Terminal Touch Accessory Bar -->
+        <div id="terminal-touch-bar" class="terminal-touch-bar" aria-label="Terminal Touch Controls">
+          <button class="term-key-btn" data-key="Escape">ESC</button>
+          <button class="term-key-btn" data-key="Tab">TAB</button>
+          <button class="term-key-btn" data-ctrl="C">^C</button>
+          <button class="term-key-btn" data-ctrl="Z">^Z</button>
+          <button class="term-key-btn" data-key="/">/</button>
+          <button class="term-key-btn" data-key="ArrowUp">▲</button>
+          <button class="term-key-btn" data-key="ArrowDown">▼</button>
+          <button class="term-key-btn" data-key="ArrowLeft">◀</button>
+          <button class="term-key-btn" data-key="ArrowRight">▶</button>
+        </div>
+
+        <div class="terminal-status-bar">
+          <span id="term-status-text">DISCONNECTED</span>
+          <span id="term-stats-text" class="mono">VT100 / XTERM-256COLOR — PRESS [/] FOR RUNNER</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- SECTION 03: SCRIPTS & RUNNABLES -->
+    <main id="view-scripts" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">03 // SCRIPT LIBRARY</span>
+          <h1 class="chapter-title">Autonomous Runnables</h1>
+          <p class="chapter-desc">Executable shell routines and Go applications. Trigger via <code class="mono">/</code> in terminal with automatic GitHub SHA verification and staging.</p>
+        </div>
+        <div class="chapter-actions">
+          <button id="btn-github-sync" class="btn-swiss">
+            <svg class="btn-icon" style="width: 13px; height: 13px;"><use href="#icon-refresh"></use></svg>
+            <span>SYNC GITHUB</span>
+          </button>
+        </div>
+      </section>
+
+      <div id="github-sync-indicator" style="margin-bottom: 1.5rem;">
+        <!-- Status rendered here -->
+      </div>
+
+      <div id="scripts-list-container" class="editorial-list">
+        <!-- Loaded via JS -->
+      </div>
+    </main>
+
+    <!-- SECTION 04: FILESYSTEM -->
+    <main id="view-files" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">04 // REMOTE STORAGE</span>
+          <h1 class="chapter-title">SFTP Filesystem</h1>
+          <p class="chapter-desc">Secure file transfer, permission auditing, inline text editor, and directory management.</p>
+        </div>
+        <div class="chapter-actions">
+          <input type="file" id="fs-upload-input" style="display: none;">
+          <button id="btn-fs-upload" class="btn-swiss">UPLOAD FILE</button>
+          <button id="btn-fs-mkdir" class="btn-swiss">+ NEW DIR</button>
+        </div>
+      </section>
+
+      <div class="fs-breadcrumbs">
+        <span class="micro-label">PATH:</span>
+        <span id="fs-current-path" class="mono">/</span>
+      </div>
+
+      <div class="fs-table-wrapper">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>NAME</th>
+              <th>PERMISSIONS</th>
+              <th>SIZE</th>
+              <th>MODIFIED</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="fs-table-body">
+            <!-- Loaded via JS -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- SECTION 05: SSH KEYS -->
+    <main id="view-keys" class="view-panel">
+      <section class="chapter-header">
+        <div class="chapter-meta">
+          <span class="micro-label">05 // CRYPTOGRAPHY</span>
+          <h1 class="chapter-title">SSH Key Vault</h1>
+          <p class="chapter-desc">Local Ed25519 keypairs, public authorized keys, and secure server provisioning.</p>
+        </div>
+        <div class="chapter-actions">
+          <button id="btn-gen-key" class="btn-swiss primary">+ GENERATE KEYPAIR</button>
+        </div>
+      </section>
+
+      <div id="keys-list-container" class="editorial-list">
+        <!-- Loaded via JS -->
+      </div>
+    </main>
+
+    <!-- Global Contextual Status Bar -->
+    <footer class="global-status-bar">
+      <div class="status-bar-left">
+        <div class="status-item">
+          <span class="status-dot" id="footer-conn-dot"></span>
+          <span id="footer-conn-label">HOST: DISCONNECTED</span>
+        </div>
+        <div class="status-item mono" id="footer-latency-box">
+          <span>LATENCY:</span>
+          <strong id="footer-latency-val">-- ms</strong>
+        </div>
+        <div class="status-item mono" id="footer-sync-status">
+          <span>SYNC:</span>
+          <span id="footer-sync-val">READY</span>
+        </div>
+      </div>
+      <div class="status-bar-right mono">
+        <span id="footer-theme-tag" class="tag-badge">DARK // LIME</span>
+        <span class="shortcut-tip" style="color: var(--text-muted);">SHORTCUTS: [/] RUNNER · [ESC] MODALS</span>
+      </div>
+    </footer>
+
+    <!-- Mobile Bottom App Bar -->
+    <nav class="mobile-bottom-bar" aria-label="Mobile Bottom Navigation">
+      <button class="mobile-bar-btn active" data-view="servers" id="mob-btn-servers">
+        <svg class="tab-icon"><use href="#icon-server"></use></svg>
+        <span>Servers</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="console" id="mob-btn-console">
+        <svg class="tab-icon"><use href="#icon-terminal"></use></svg>
+        <span>Console</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="scripts" id="mob-btn-scripts">
+        <svg class="tab-icon"><use href="#icon-play"></use></svg>
+        <span>Scripts</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="files" id="mob-btn-files">
+        <svg class="tab-icon"><use href="#icon-folder"></use></svg>
+        <span>Files</span>
+      </button>
+      <button class="mobile-bar-btn" data-view="keys" id="mob-btn-keys">
+        <svg class="tab-icon"><use href="#icon-key"></use></svg>
+        <span>Keys</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- MODAL: APPEARANCE SETTINGS (THEMES & ACCENTS) -->
+  <div id="modal-appearance" class="modal-overlay">
+    <div class="editorial-modal" style="max-width: 680px;">
+      <div class="modal-header">
+        <span class="modal-title">
+          <svg style="width: 16px; height: 16px;"><use href="#icon-palette"></use></svg>
+          APPEARANCE & THEME ARCHITECTURE
+        </span>
+        <button class="modal-close-btn" data-close="modal-appearance">ESC ✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- 1. Theme Selection -->
+        <div class="appearance-section">
+          <div class="appearance-title">Interface Color Mode</div>
+          <div class="theme-picker-grid">
+            <div class="theme-card active" data-theme-val="dark">
+              <div class="theme-preview-box dark">
+                <div class="t-bar"></div>
+                <div class="t-body"></div>
+              </div>
+              <div class="theme-card-label">
+                <span>DARK GRAPHITE</span>
+                <span class="theme-check-icon">✓</span>
+              </div>
+            </div>
+            <div class="theme-card" data-theme-val="light">
+              <div class="theme-preview-box light">
+                <div class="t-bar"></div>
+                <div class="t-body"></div>
+              </div>
+              <div class="theme-card-label">
+                <span>LIGHT PAPER</span>
+                <span class="theme-check-icon"></span>
+              </div>
+            </div>
+            <div class="theme-card" data-theme-val="system">
+              <div class="theme-preview-box system">
+                <div class="t-bar"></div>
+                <div class="t-body"></div>
+              </div>
+              <div class="theme-card-label">
+                <span>SYSTEM SYNC</span>
+                <span class="theme-check-icon"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Accent Color Palette -->
+        <div class="appearance-section">
+          <div class="appearance-title">Curated Accent Spectrum</div>
+          <div class="accent-swatches-grid" id="accent-swatches-container">
+            <!-- Rendered dynamically by JS -->
+          </div>
+          <div class="custom-accent-row">
+            <input type="color" id="custom-accent-input" class="custom-color-picker" value="#d9f927" title="Choose custom accent color">
+            <span class="mono" style="font-size: 12px; color: var(--text-secondary);">Custom HEX Value:</span>
+            <input type="text" id="custom-accent-hex" class="form-input mono" style="width: 110px; padding: 0.35rem 0.65rem; font-size: 12px;" value="#D9F927" maxlength="7">
+          </div>
+        </div>
+
+        <!-- 3. Layout Density & Motion Physics -->
+        <div class="appearance-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div>
+            <div class="appearance-title">Density</div>
+            <div class="toggle-group" id="density-toggle-group">
+              <button class="toggle-opt active" data-density-val="comfortable">Comfortable</button>
+              <button class="toggle-opt" data-density-val="compact">Compact</button>
+            </div>
+          </div>
+          <div>
+            <div class="appearance-title">Motion Physics</div>
+            <div class="toggle-group" id="motion-toggle-group">
+              <button class="toggle-opt active" data-motion-val="system">System</button>
+              <button class="toggle-opt" data-motion-val="full">Full</button>
+              <button class="toggle-opt" data-motion-val="reduced">Reduced</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SLASH COMMAND PALETTE (/) -->
+  <div id="modal-slash-palette" class="modal-overlay">
+    <div class="editorial-modal">
+      <div class="modal-header">
+        <span class="modal-title">RUNNABLE COMMAND PALETTE</span>
+        <button class="modal-close-btn" data-close="modal-slash-palette">ESC ✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="palette-search-box">
+          <span class="palette-prefix">/</span>
+          <input type="text" id="palette-search-input" class="palette-input" placeholder="Type script or package name to execute..." autofocus>
+        </div>
+        <div id="palette-results-list" class="palette-results">
+          <!-- Filtered scripts rendered here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MULTI-STAGE PIPELINE RUNNER -->
+  <div id="modal-pipeline-runner" class="modal-overlay">
+    <div class="editorial-modal" style="max-width: 900px;">
+      <div class="modal-header">
+        <span id="pipeline-modal-title" class="modal-title">PIPELINE EXECUTION</span>
+        <button class="modal-close-btn" data-close="modal-pipeline-runner">ESC ✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="pipeline-card">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span class="micro-label">DEPLOYMENT STAGES</span>
+            <span id="pipeline-target-server" class="mono" style="font-size: 11px; color: var(--accent-base);">TARGET: ROOT@NODE-01</span>
+          </div>
+
+          <div class="pipeline-progress-bar">
+            <div id="pipeline-progress-fill" class="pipeline-progress-fill"></div>
+          </div>
+
+          <div class="pipeline-steps">
+            <div id="step-node-1" class="step-node active">
+              <span class="step-number">01 / GITHUB</span>
+              <span class="step-title">SHA VERIFY</span>
+              <span id="step-desc-1" class="step-status">Checking remote...</span>
+            </div>
+            <div id="step-node-2" class="step-node">
+              <span class="step-number">02 / STAGE</span>
+              <span class="step-title">PAYLOAD PREP</span>
+              <span id="step-desc-2" class="step-status">Pending</span>
+            </div>
+            <div id="step-node-3" class="step-node">
+              <span class="step-number">03 / SFTP</span>
+              <span class="step-title">REMOTE UPLOAD</span>
+              <span id="step-desc-3" class="step-status">Pending</span>
+            </div>
+            <div id="step-node-4" class="step-node">
+              <span class="step-number">04 / EXEC</span>
+              <span class="step-title">CHMOD & RUN</span>
+              <span id="step-desc-4" class="step-status">Pending</span>
+            </div>
+          </div>
+        </div>
+
+        <span class="micro-label">EXECUTION LOGS</span>
+        <pre id="pipeline-output-log" class="pipeline-console-output">Waiting for execution output...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SERVER EDIT/ADD -->
+  <div id="modal-server-form" class="modal-overlay">
+    <div class="editorial-modal">
+      <div class="modal-header">
+        <span id="server-form-title" class="modal-title">SERVER CONFIGURATION</span>
+        <button class="modal-close-btn" data-close="modal-server-form">ESC ✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="server-form" class="form-grid">
+          <div class="form-group">
+            <label class="form-label">SERVER IDENTIFIER</label>
+            <input type="text" id="sf-name" class="form-input" placeholder="e.g. prod-app-01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">HOST / IP ADDRESS</label>
+            <input type="text" id="sf-host" class="form-input" placeholder="192.168.1.100 or host.domain" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">SSH PORT</label>
+            <input type="text" id="sf-port" class="form-input" value="22" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">SSH USER</label>
+            <input type="text" id="sf-user" class="form-input" value="root" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">AUTH METHOD</label>
+            <select id="sf-auth-method" class="form-select">
+              <option value="key">SSH Key (Recommended)</option>
+              <option value="password">Password</option>
+            </select>
+          </div>
+          <div class="form-group" id="sf-keypath-group">
+            <label class="form-label">SSH KEY RELATIVE PATH</label>
+            <input type="text" id="sf-keypath" class="form-input" placeholder="keys/prod-app-01.ed25519">
+          </div>
+          <div class="form-group" id="sf-password-group" style="display: none;">
+            <label class="form-label">PASSWORD</label>
+            <input type="password" id="sf-password" class="form-input" placeholder="••••••••" autocomplete="current-password">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">DESCRIPTION</label>
+            <input type="text" id="sf-desc" class="form-input" placeholder="Production application server">
+          </div>
+          <div class="form-group full" style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-swiss" data-close="modal-server-form">CANCEL</button>
+            <button type="submit" class="btn-swiss primary">SAVE SERVER</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: FILE TEXT EDITOR -->
+  <div id="modal-file-editor" class="modal-overlay">
+    <div class="editorial-modal" style="max-width: 960px;">
+      <div class="modal-header">
+        <span id="editor-file-title" class="modal-title">EDITING: /etc/nginx/nginx.conf</span>
+        <button class="modal-close-btn" data-close="modal-file-editor">ESC ✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="editor-file-content" class="form-textarea mono" style="width: 100%; height: 420px; font-size: 13px; line-height: 1.4; resize: vertical;"></textarea>
+        <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-swiss" data-close="modal-file-editor">CANCEL</button>
+          <button id="btn-save-file" type="button" class="btn-swiss primary">SAVE CHANGES</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/js/terminal.js"></script>
+  <script src="/js/slash_runner.js"></script>
+  <script src="/js/servers.js"></script>
+  <script src="/js/files.js"></script>
+  <script src="/js/keys.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
