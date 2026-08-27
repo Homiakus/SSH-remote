@@ -35,12 +35,28 @@ jobs:
       - name: Download modules
         run: go mod download
 
-      - name: Formatting
+      - name: Formatting ratchet
         shell: bash
         run: |
-          unformatted="$(gofmt -l .)"
+          set -euo pipefail
+          files=()
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go')
+          elif [[ "${{ github.event_name }}" == "push" && -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "${{ github.event.before }}...HEAD" -- '*.go')
+          else
+            mapfile -t files < <(git ls-files '*.go')
+          fi
+
+          if (( ${#files[@]} == 0 )); then
+            echo "No changed Go files; formatting ratchet is unchanged."
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${files[@]}")"
           if [[ -n "$unformatted" ]]; then
-            echo "The following files are not gofmt-clean:"
+            echo "Changed Go files are not gofmt-clean:"
             echo "$unformatted"
             exit 1
           fi
