@@ -55,11 +55,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go'; then
-            echo "source_go=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "source_go=true" >> "$GITHUB_OUTPUT"
-          fi
+          source_go=false
+          test_go=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if [[ "$file" == *_test.go ]]; then
+              test_go=true
+            else
+              source_go=true
+            fi
+          done < <(git diff --name-only --diff-filter=ACMRT "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go')
+
+          echo "source_go=$source_go" >> "$GITHUB_OUTPUT"
+          echo "test_go=$test_go" >> "$GITHUB_OUTPUT"
 
           if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- go.mod go.sum; then
             echo "module_graph=false" >> "$GITHUB_OUTPUT"
@@ -76,8 +84,8 @@ jobs:
             --coverpkg "./..." \
             --output-statuses lctv
 
-      - name: Bootstrap mutation baseline after module graph change
-        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.module_graph == 'true'
+      - name: Full ratchet campaign after tests or module graph change
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && (steps.changes.outputs.test_go == 'true' || steps.changes.outputs.module_graph == 'true')
         shell: bash
         run: |
           gremlins unleash \
@@ -87,7 +95,7 @@ jobs:
             --threshold-mcover 0
 
       - name: Validate mutation configuration
-        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.module_graph != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.test_go != 'true' && steps.changes.outputs.module_graph != 'true'
         shell: bash
         run: |
           gremlins unleash \
@@ -101,7 +109,16 @@ jobs:
         run: |
           gremlins unleash \
             --coverpkg "./..." \
-            --output-statuses lctv
+            --output-statuses lctv \
+            --threshold-efficacy 0 \
+            --threshold-mcover 0
+
+      - name: Mutation baseline ratchet
+        if: github.event_name != 'pull_request' || (steps.changes.outputs.source_go != 'true' && (steps.changes.outputs.test_go == 'true' || steps.changes.outputs.module_graph == 'true'))
+        run: |
+          python3 .quality/check_mutation_ratchet.py \
+            --baseline .quality/baseline.json \
+            --report mutation-report.json
 
       - name: Upload mutation report
         if: always()
