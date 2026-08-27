@@ -1,6 +1,6 @@
 # SSHPilot — Quality Baseline Ledger
 
-Captured: **2026-08-27**. This document summarizes the machine-readable baseline in `.quality/baseline.json`.
+Captured: **2026-08-27**. This document summarizes the machine-readable baseline in `.quality/baseline.json`. Coverage and test-duration values are taken directly from quality run `33112121445` artifact `9662984408`; mutation values are from run `33112121489`.
 
 ## Module baseline
 
@@ -21,37 +21,38 @@ Captured: **2026-08-27**. This document summarizes the machine-readable baseline
 | Package | Coverage | Test time |
 |---|---:|---:|
 | `sshpilot` | 0.0% | n/a |
-| `sshpilot/internal/config` | 62.3% | 0.011s |
-| `sshpilot/internal/diagnostics` | 33.5% | 0.128s |
-| `sshpilot/internal/loadtest` | 62.7% | 0.412s |
+| `sshpilot/internal/config` | 62.3% | 0.013s |
+| `sshpilot/internal/diagnostics` | 34.1% | 0.136s |
+| `sshpilot/internal/loadtest` | 62.7% | 0.416s |
 | `sshpilot/internal/log` | 0.0% | n/a |
-| `sshpilot/internal/monitoring` | 77.4% | 0.004s |
-| `sshpilot/internal/scripts` | 23.8% | 0.005s |
-| `sshpilot/internal/ssh` | 35.4% | 0.015s |
-| `sshpilot/internal/ui` | 18.7% | 0.011s |
+| `sshpilot/internal/monitoring` | 77.4% | 0.010s |
+| `sshpilot/internal/scripts` | 23.8% | 0.006s |
+| `sshpilot/internal/ssh` | 35.2% | 0.029s |
+| `sshpilot/internal/ui` | 18.7% | 0.029s |
 | `sshpilot/internal/ui/components` | 0.0% | n/a |
-| `sshpilot/internal/ui/screens` | 45.6% | 0.190s |
+| `sshpilot/internal/ui/screens` | 45.6% | 0.198s |
 | `sshpilot/internal/ui/theme` | n/a | n/a |
 | `sshpilot/internal/web` | 0.0% | n/a |
-| `sshpilot/internal/web/handlers` | 8.9% | 0.154s |
-| `sshpilot/internal/web/ws` | 60.9% | 0.005s |
+| `sshpilot/internal/web/handlers` | 8.9% | 0.160s |
+| `sshpilot/internal/web/ws` | 60.9% | 0.006s |
 | `sshpilot/scripts/go/site-admin-tui` | 0.0% | n/a |
 | `sshpilot/scripts/go/site-admin-tui/internal/cli` | 0.0% | n/a |
-| `sshpilot/scripts/go/site-admin-tui/internal/deploy` | 46.7% | 0.021s |
-| `sshpilot/scripts/go/site-admin-tui/internal/domain` | 60.2% | 0.009s |
-| `sshpilot/scripts/go/site-admin-tui/internal/nginx` | 53.3% | 0.007s |
+| `sshpilot/scripts/go/site-admin-tui/internal/deploy` | 46.7% | 0.029s |
+| `sshpilot/scripts/go/site-admin-tui/internal/domain` | 60.2% | 0.006s |
+| `sshpilot/scripts/go/site-admin-tui/internal/nginx` | 53.3% | 0.006s |
 | `sshpilot/scripts/go/site-admin-tui/internal/runtime` | 0.0% | n/a |
-| `sshpilot/scripts/go/site-admin-tui/internal/state` | 46.9% | 0.009s |
-| `sshpilot/scripts/go/site-admin-tui/internal/system` | 9.6% | 0.009s |
-| `sshpilot/scripts/go/site-admin-tui/internal/tui` | 12.1% | 0.012s |
+| `sshpilot/scripts/go/site-admin-tui/internal/state` | 46.9% | 0.013s |
+| `sshpilot/scripts/go/site-admin-tui/internal/system` | 9.6% | 0.004s |
+| `sshpilot/scripts/go/site-admin-tui/internal/tui` | 12.1% | 0.005s |
 
 ## Ratchet semantics
 
 - A baseline is a floor, not a target. Existing debt is made visible without granting permission for new debt.
 - Every package with a numeric statement-coverage baseline must remain at or above that value (0.05 percentage-point rounding tolerance).
-- Differential mutation testing for changed Go source uses a stronger new-code gate: efficacy ≥80% and mutant coverage ≥70%.
+- Differential mutation testing for changed production Go source uses a stronger new-code gate: efficacy ≥80% and mutant coverage ≥70%.
 - Full mutation campaigns are compared with module and package baselines; security-critical packages have a progressive target of ≥90% efficacy.
 - Race/build/vulnerability regressions are hard failures; they are never ratcheted downward.
+- Baseline values are traceable to immutable CI artifacts. Corrections are allowed only when the committed value is proven inconsistent with its declared source artifact; this is not considered lowering a quality threshold.
 
 ## Known baseline debt
 
