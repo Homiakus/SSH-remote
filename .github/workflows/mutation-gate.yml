@@ -1,0 +1,130 @@
+name: Mutation Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".gremlins.yaml"
+      - ".github/workflows/mutation-gate.yml"
+      - ".quality/**"
+  schedule:
+    - cron: "30 2 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: Test-of-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Baseline tests
+        run: go test -count=1 ./...
+
+      - name: Install Gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+
+      - name: Detect mutation scope
+        if: github.event_name == 'pull_request'
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source_go=false
+          test_go=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if [[ "$file" == *_test.go ]]; then
+              test_go=true
+            else
+              source_go=true
+            fi
+          done < <(git diff --name-only --diff-filter=ACMRT "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go')
+
+          echo "source_go=$source_go" >> "$GITHUB_OUTPUT"
+          echo "test_go=$test_go" >> "$GITHUB_OUTPUT"
+
+          if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- go.mod go.sum; then
+            echo "module_graph=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "module_graph=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Differential mutation test
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go == 'true'
+        shell: bash
+        run: |
+          gremlins unleash \
+            --diff "origin/${GITHUB_BASE_REF}" \
+            --coverpkg "./..." \
+            --output-statuses lctv
+
+      - name: Full ratchet campaign after tests or module graph change
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && (steps.changes.outputs.test_go == 'true' || steps.changes.outputs.module_graph == 'true')
+        shell: bash
+        run: |
+          gremlins unleash \
+            --coverpkg "./..." \
+            --output-statuses lctv \
+            --threshold-efficacy 0 \
+            --threshold-mcover 0
+
+      - name: Validate mutation configuration
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.test_go != 'true' && steps.changes.outputs.module_graph != 'true'
+        shell: bash
+        run: |
+          gremlins unleash \
+            --dry-run \
+            --coverpkg "./..." \
+            --output-statuses rcv
+
+      - name: Full mutation campaign
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          gremlins unleash \
+            --coverpkg "./..." \
+            --output-statuses lctv \
+            --threshold-efficacy 0 \
+            --threshold-mcover 0
+
+      - name: Mutation baseline ratchet
+        if: github.event_name != 'pull_request' || (steps.changes.outputs.source_go != 'true' && (steps.changes.outputs.test_go == 'true' || steps.changes.outputs.module_graph == 'true'))
+        run: |
+          python3 .quality/check_mutation_ratchet.py \
+            --baseline .quality/baseline.json \
+            --report mutation-report.json
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-${{ github.run_id }}
+          path: mutation-report.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,158 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-quality:
+    name: Go quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Normalize module graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          go mod tidy
+          git diff -- go.mod go.sum | tee module-tidy.diff
+
+      - name: Formatting ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=()
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go')
+          elif [[ "${{ github.event_name }}" == "push" && -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "${{ github.event.before }}...HEAD" -- '*.go')
+          else
+            mapfile -t files < <(git ls-files '*.go')
+          fi
+
+          if (( ${#files[@]} == 0 )); then
+            echo "No changed Go files; formatting ratchet is unchanged."
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [[ -n "$unformatted" ]]; then
+            echo "Changed Go files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Deterministic tests and coverage baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -coverprofile=coverage.out ./... | tee package-coverage.txt
+          go tool cover -func=coverage.out | tee coverage-functions.txt
+
+      - name: Coverage ratchet
+        run: |
+          python3 .quality/check_coverage_ratchet.py \
+            --baseline .quality/baseline.json \
+            --packages package-coverage.txt \
+            --functions coverage-functions.txt
+
+      - name: Race detector
+        run: go test -race -count=1 ./...
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+
+      - name: Vulnerability analysis
+        run: govulncheck ./...
+
+      - name: Upload quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-${{ github.run_id }}
+          path: |
+            coverage.out
+            package-coverage.txt
+            coverage-functions.txt
+            module-tidy.diff
+            go.mod
+            go.sum
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Module hygiene gate
+        shell: bash
+        run: |
+          if [[ -s module-tidy.diff ]]; then
+            echo "go mod tidy changes are required and must be committed:"
+            cat module-tidy.diff
+            exit 1
+          fi
+
+  cross-build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Cross-build all packages
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: go build ./...
