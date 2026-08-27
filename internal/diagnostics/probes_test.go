@@ -65,3 +65,51 @@ func TestRunPingJitter(t *testing.T) {
 		t.Fatalf("samples count = %d, want 5", len(res.Samples))
 	}
 }
+
+func TestRunPingJitterNormalizesCountAndRecordsDialFailures(t *testing.T) {
+	// A non-numeric TCP service makes net.DialTimeout fail during address
+	// resolution immediately and deterministically. This exercises the error
+	// path without relying on public networks, firewall state, or timing.
+	cfg := &config.ServerConfig{
+		Host: "127.0.0.1",
+		Port: "invalid-service",
+	}
+
+	tests := []struct {
+		name      string
+		requested int
+		wantCount int
+	}{
+		{name: "default_non_positive", requested: 0, wantCount: 5},
+		{name: "clamp_above_maximum", requested: 21, wantCount: 20},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := RunPingJitter(cfg, tt.requested)
+			if res.Count != tt.wantCount {
+				t.Fatalf("count = %d, want %d", res.Count, tt.wantCount)
+			}
+			if res.Successful != 0 {
+				t.Fatalf("successful = %d, want 0", res.Successful)
+			}
+			if res.Lost != tt.wantCount {
+				t.Fatalf("lost = %d, want %d", res.Lost, tt.wantCount)
+			}
+			if res.LossPercent != 100.0 {
+				t.Fatalf("loss percent = %v, want 100", res.LossPercent)
+			}
+			if len(res.Samples) != tt.wantCount {
+				t.Fatalf("samples count = %d, want %d", len(res.Samples), tt.wantCount)
+			}
+			for i, sample := range res.Samples {
+				if sample.Success {
+					t.Fatalf("sample %d unexpectedly succeeded", i+1)
+				}
+				if sample.Error == "" {
+					t.Fatalf("sample %d has empty error", i+1)
+				}
+			}
+		})
+	}
+}
