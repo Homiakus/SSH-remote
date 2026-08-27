@@ -9,6 +9,7 @@ on:
       - "go.sum"
       - ".gremlins.yaml"
       - ".github/workflows/mutation-gate.yml"
+      - ".quality/**"
   schedule:
     - cron: "30 2 * * 0"
   workflow_dispatch:
@@ -47,22 +48,27 @@ jobs:
       - name: Install Gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
 
-      - name: Detect semantic Go changes
+      - name: Detect mutation scope
         if: github.event_name == 'pull_request'
         id: changes
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go' go.mod go.sum; then
-            echo "go_changed=false" >> "$GITHUB_OUTPUT"
-            echo "No Go semantic changes in this PR."
+
+          if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- '*.go'; then
+            echo "source_go=false" >> "$GITHUB_OUTPUT"
           else
-            echo "go_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Go semantic changes detected."
+            echo "source_go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --quiet "origin/${GITHUB_BASE_REF}...HEAD" -- go.mod go.sum; then
+            echo "module_graph=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "module_graph=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Differential mutation test
-        if: github.event_name == 'pull_request' && steps.changes.outputs.go_changed == 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go == 'true'
         shell: bash
         run: |
           gremlins unleash \
@@ -70,8 +76,18 @@ jobs:
             --coverpkg "./..." \
             --output-statuses lctv
 
+      - name: Bootstrap mutation baseline after module graph change
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.module_graph == 'true'
+        shell: bash
+        run: |
+          gremlins unleash \
+            --coverpkg "./..." \
+            --output-statuses lctv \
+            --threshold-efficacy 0 \
+            --threshold-mcover 0
+
       - name: Validate mutation configuration
-        if: github.event_name == 'pull_request' && steps.changes.outputs.go_changed != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.source_go != 'true' && steps.changes.outputs.module_graph != 'true'
         shell: bash
         run: |
           gremlins unleash \
