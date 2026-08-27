@@ -1,0 +1,75 @@
+name: Mutation Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".gremlins.yaml"
+      - ".github/workflows/mutation-gate.yml"
+  schedule:
+    - cron: "30 2 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: Test-of-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Baseline tests
+        run: go test -count=1 ./...
+
+      - name: Install Gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+
+      - name: Differential mutation test
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git fetch origin "${GITHUB_BASE_REF}:${GITHUB_BASE_REF}" || true
+          gremlins unleash \
+            --diff "origin/${GITHUB_BASE_REF}" \
+            --coverpkg "./..." \
+            --output-statuses lctv
+
+      - name: Full mutation campaign
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          gremlins unleash \
+            --coverpkg "./..." \
+            --output-statuses lctv
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-${{ github.run_id }}
+          path: mutation-report.json
+          if-no-files-found: warn
+          retention-days: 30
