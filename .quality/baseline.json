@@ -1,0 +1,429 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-27",
+  "source": {
+    "quality_run_id": 33112121445,
+    "mutation_run_id": 33112121489,
+    "branch": "engineering/controlled-code-loop",
+    "go_version": "1.26.7",
+    "quality_head_sha": "de4c162bb83068ea5b26259e5adaec6055482bfb"
+  },
+  "policy": {
+    "ratchet": "non_regression",
+    "coverage_rounding_tolerance_pct": 0.05,
+    "differential_mutation_min_test_efficacy_pct": 80.0,
+    "differential_mutation_min_mutant_coverage_pct": 70.0,
+    "critical_target_test_efficacy_pct": 90.0,
+    "critical_packages": [
+      "sshpilot/internal/config",
+      "sshpilot/internal/ssh",
+      "sshpilot/internal/web/handlers",
+      "sshpilot/internal/web/ws"
+    ]
+  },
+  "module": {
+    "statement_coverage_pct": 37.3,
+    "mutation": {
+      "test_efficacy_pct": 8.3125,
+      "mutant_coverage_pct": 50.7453,
+      "mutants_total_runnable": 1600,
+      "mutants_killed": 133,
+      "mutants_lived": 1467,
+      "mutants_not_covered": 1553,
+      "mutants_not_viable": 0,
+      "elapsed_seconds": 551.21
+    },
+    "race": "pass",
+    "go_build": "pass",
+    "govulncheck": "pass",
+    "cross_build_targets": {
+      "windows/amd64": "pass",
+      "windows/arm64": "pass",
+      "linux/amd64": "pass",
+      "linux/arm64": "pass",
+      "darwin/amd64": "pass",
+      "darwin/arm64": "pass"
+    },
+    "fuzz_targets": 0,
+    "legacy_format_debt": [
+      "internal/config/vault.go",
+      "internal/diagnostics/probes.go",
+      "internal/diagnostics/types.go",
+      "internal/loadtest/job.go",
+      "internal/loadtest/types.go",
+      "internal/ui/screens/connected_confirm.go",
+      "internal/web/handlers/scripts.go",
+      "main.go"
+    ]
+  },
+  "packages": {
+    "sshpilot": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": null,
+        "mutant_coverage_pct": 0.0,
+        "mutants_killed": 0,
+        "mutants_lived": 0,
+        "mutants_not_covered": 8,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/config": {
+      "statement_coverage_pct": 62.3,
+      "test_duration_seconds": 0.011,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 15.2381,
+        "mutant_coverage_pct": 75.0,
+        "mutants_killed": 16,
+        "mutants_lived": 89,
+        "mutants_not_covered": 35,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/diagnostics": {
+      "statement_coverage_pct": 33.5,
+      "test_duration_seconds": 0.128,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 65.6566,
+        "mutants_killed": 0,
+        "mutants_lived": 65,
+        "mutants_not_covered": 34,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/loadtest": {
+      "statement_coverage_pct": 62.7,
+      "test_duration_seconds": 0.412,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 5.7143,
+        "mutant_coverage_pct": 78.9474,
+        "mutants_killed": 6,
+        "mutants_lived": 99,
+        "mutants_not_covered": 28,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/log": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": null,
+        "mutant_coverage_pct": 0.0,
+        "mutants_killed": 0,
+        "mutants_lived": 0,
+        "mutants_not_covered": 7,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/monitoring": {
+      "statement_coverage_pct": 77.4,
+      "test_duration_seconds": 0.004,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 6.8627,
+        "mutant_coverage_pct": 88.6957,
+        "mutants_killed": 7,
+        "mutants_lived": 95,
+        "mutants_not_covered": 13,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/scripts": {
+      "statement_coverage_pct": 23.8,
+      "test_duration_seconds": 0.005,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 7.5472,
+        "mutant_coverage_pct": 47.7477,
+        "mutants_killed": 4,
+        "mutants_lived": 49,
+        "mutants_not_covered": 58,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/ssh": {
+      "statement_coverage_pct": 35.4,
+      "test_duration_seconds": 0.015,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 17.931,
+        "mutant_coverage_pct": 43.4132,
+        "mutants_killed": 26,
+        "mutants_lived": 119,
+        "mutants_not_covered": 189,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/ui": {
+      "statement_coverage_pct": 18.7,
+      "test_duration_seconds": 0.011,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 13.1579,
+        "mutants_killed": 0,
+        "mutants_lived": 5,
+        "mutants_not_covered": 33,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/ui/components": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 28.5714,
+        "mutant_coverage_pct": 100.0,
+        "mutants_killed": 2,
+        "mutants_lived": 5,
+        "mutants_not_covered": 0,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/ui/screens": {
+      "statement_coverage_pct": 45.6,
+      "test_duration_seconds": 0.19,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 12.0527,
+        "mutant_coverage_pct": 47.7089,
+        "mutants_killed": 64,
+        "mutants_lived": 467,
+        "mutants_not_covered": 582,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/ui/theme": {
+      "statement_coverage_pct": null,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": null
+    },
+    "sshpilot/internal/web": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": null,
+        "mutant_coverage_pct": 0.0,
+        "mutants_killed": 0,
+        "mutants_lived": 0,
+        "mutants_not_covered": 22,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/web/handlers": {
+      "statement_coverage_pct": 8.9,
+      "test_duration_seconds": 0.154,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 13.6364,
+        "mutant_coverage_pct": 7.3579,
+        "mutants_killed": 3,
+        "mutants_lived": 19,
+        "mutants_not_covered": 277,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/internal/web/ws": {
+      "statement_coverage_pct": 60.9,
+      "test_duration_seconds": 0.005,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 15.1515,
+        "mutant_coverage_pct": 84.6154,
+        "mutants_killed": 5,
+        "mutants_lived": 28,
+        "mutants_not_covered": 6,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": null
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/cli": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": null,
+        "mutant_coverage_pct": 0.0,
+        "mutants_killed": 0,
+        "mutants_lived": 0,
+        "mutants_not_covered": 9,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/deploy": {
+      "statement_coverage_pct": 46.7,
+      "test_duration_seconds": 0.021,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 60.274,
+        "mutants_killed": 0,
+        "mutants_lived": 88,
+        "mutants_not_covered": 58,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/domain": {
+      "statement_coverage_pct": 60.2,
+      "test_duration_seconds": 0.009,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 99.1597,
+        "mutants_killed": 0,
+        "mutants_lived": 118,
+        "mutants_not_covered": 1,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/nginx": {
+      "statement_coverage_pct": 53.3,
+      "test_duration_seconds": 0.007,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 93.75,
+        "mutants_killed": 0,
+        "mutants_lived": 60,
+        "mutants_not_covered": 4,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/runtime": {
+      "statement_coverage_pct": 0.0,
+      "test_duration_seconds": null,
+      "race": "not_applicable_no_tests",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 41.5094,
+        "mutants_killed": 0,
+        "mutants_lived": 22,
+        "mutants_not_covered": 31,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/state": {
+      "statement_coverage_pct": 46.9,
+      "test_duration_seconds": 0.009,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 55.0562,
+        "mutants_killed": 0,
+        "mutants_lived": 49,
+        "mutants_not_covered": 40,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/system": {
+      "statement_coverage_pct": 9.6,
+      "test_duration_seconds": 0.009,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 73.1959,
+        "mutants_killed": 0,
+        "mutants_lived": 71,
+        "mutants_not_covered": 26,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    },
+    "sshpilot/scripts/go/site-admin-tui/internal/tui": {
+      "statement_coverage_pct": 12.1,
+      "test_duration_seconds": 0.012,
+      "race": "pass",
+      "build": "pass",
+      "fuzz_targets": 0,
+      "mutation": {
+        "test_efficacy_pct": 0.0,
+        "mutant_coverage_pct": 17.1171,
+        "mutants_killed": 0,
+        "mutants_lived": 19,
+        "mutants_not_covered": 92,
+        "mutants_not_viable": 0,
+        "mutants_timed_out": 0
+      }
+    }
+  }
+}
