@@ -1,9 +1,12 @@
 package sshfixture
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"strings"
 	"sync"
@@ -30,10 +33,12 @@ type CommandResult struct {
 
 // Options configures a deterministic in-process SSH server.
 type Options struct {
-	User     string
-	Password string
-	Mode     Mode
-	Commands map[string]CommandResult
+	User             string
+	Password         string
+	Mode             Mode
+	Commands         map[string]CommandResult
+	Algorithms       *gossh.Algorithms
+	HostKeyAlgorithm string
 }
 
 // Server is an in-process SSH protocol fixture with deterministic failure modes.
@@ -48,6 +53,10 @@ type Server struct {
 	conns     map[net.Conn]struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
+
+	algorithmsMu   sync.Mutex
+	lastAlgorithms gossh.NegotiatedAlgorithms
+	hasAlgorithms  bool
 }
 
 // Start listens on an ephemeral loopback port and starts the fixture.
@@ -59,14 +68,9 @@ func Start(opts Options) (*Server, error) {
 		return nil, fmt.Errorf("fixture password is required")
 	}
 
-	seed := make([]byte, ed25519.SeedSize)
-	for i := range seed {
-		seed[i] = byte(i + 1)
-	}
-	privateKey := ed25519.NewKeyFromSeed(seed)
-	signer, err := gossh.NewSignerFromKey(privateKey)
+	signer, err := deterministicSigner(opts.HostKeyAlgorithm)
 	if err != nil {
-		return nil, fmt.Errorf("create fixture signer: %w", err)
+		return nil, err
 	}
 
 	serverConfig := &gossh.ServerConfig{
@@ -76,6 +80,13 @@ func Start(opts Options) (*Server, error) {
 			}
 			return nil, nil
 		},
+	}
+	if opts.Algorithms != nil {
+		serverConfig.Config = gossh.Config{
+			KeyExchanges: append([]string(nil), opts.Algorithms.KeyExchanges...),
+			Ciphers:      append([]string(nil), opts.Algorithms.Ciphers...),
+			MACs:         append([]string(nil), opts.Algorithms.MACs...),
+		}
 	}
 	serverConfig.AddHostKey(signer)
 
@@ -110,6 +121,13 @@ func (s *Server) Address() string {
 // PublicKey returns the deterministic host key advertised by the fixture.
 func (s *Server) PublicKey() gossh.PublicKey {
 	return s.signer.PublicKey()
+}
+
+// NegotiatedAlgorithms returns the most recent successful handshake algorithms.
+func (s *Server) NegotiatedAlgorithms() (gossh.NegotiatedAlgorithms, bool) {
+	s.algorithmsMu.Lock()
+	defer s.algorithmsMu.Unlock()
+	return s.lastAlgorithms, s.hasAlgorithms
 }
 
 // Close terminates the listener and all accepted connections and waits for handlers to exit.
@@ -155,6 +173,12 @@ func (s *Server) handleConn(conn net.Conn) {
 		return
 	}
 	defer serverConn.Close()
+	if metadata, ok := any(serverConn).(gossh.AlgorithmsConnMetadata); ok {
+		s.algorithmsMu.Lock()
+		s.lastAlgorithms = metadata.Algorithms()
+		s.hasAlgorithms = true
+		s.algorithmsMu.Unlock()
+	}
 	go gossh.DiscardRequests(requests)
 
 	for newChannel := range channels {
@@ -209,4 +233,35 @@ func (s *Server) track(conn net.Conn, add bool) {
 		return
 	}
 	delete(s.conns, conn)
+}
+
+func deterministicSigner(algorithm string) (gossh.Signer, error) {
+	switch algorithm {
+	case "", gossh.KeyAlgoED25519:
+		seed := make([]byte, ed25519.SeedSize)
+		for i := range seed {
+			seed[i] = byte(i + 1)
+		}
+		privateKey := ed25519.NewKeyFromSeed(seed)
+		signer, err := gossh.NewSignerFromKey(privateKey)
+		if err != nil {
+			return nil, fmt.Errorf("create Ed25519 fixture signer: %w", err)
+		}
+		return signer, nil
+	case gossh.KeyAlgoECDSA256:
+		curve := elliptic.P256()
+		d := big.NewInt(7)
+		x, y := curve.ScalarBaseMult(d.Bytes())
+		privateKey := &ecdsa.PrivateKey{
+			PublicKey: ecdsa.PublicKey{Curve: curve, X: x, Y: y},
+			D:         d,
+		}
+		signer, err := gossh.NewSignerFromKey(privateKey)
+		if err != nil {
+			return nil, fmt.Errorf("create ECDSA fixture signer: %w", err)
+		}
+		return signer, nil
+	default:
+		return nil, fmt.Errorf("unsupported deterministic fixture host-key algorithm %q", algorithm)
+	}
 }

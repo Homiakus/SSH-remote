@@ -45,6 +45,8 @@ func connectionTarget(cfg *config.ServerConfig) string {
 // Connect устанавливает SSH-подключение к серверу по конфигурации.
 // Использует TOFU (Trust On First Use) для проверки host key через
 // собственный known_hosts-файл в servers/known_hosts.
+// Криптографические алгоритмы задаются явной fail-closed политикой из
+// crypto_policy.go; небезопасные алгоритмы x/crypto/ssh не разрешаются.
 // Таймаут подключения: 20 секунд.
 func Connect(cfg *config.ServerConfig) (*ssh.Client, error) {
 	authMethods, err := buildAuthMethods(cfg)
@@ -52,48 +54,21 @@ func Connect(cfg *config.ServerConfig) (*ssh.Client, error) {
 		return nil, fmt.Errorf("ошибка аутентификации: %w", err)
 	}
 
+	algorithms, err := defaultCryptoAlgorithms()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка криптографической политики SSH: %w", err)
+	}
+
 	sshConfig := &ssh.ClientConfig{
-		User:            strings.TrimSpace(cfg.User),
-		Auth:            authMethods,
-		HostKeyCallback: tofuHostKeyCallback(config.KnownHostsPath()),
-		Timeout:         20 * time.Second,
-		HostKeyAlgorithms: []string{
-			ssh.KeyAlgoED25519,
-			ssh.KeyAlgoECDSA256,
-			ssh.KeyAlgoECDSA384,
-			ssh.KeyAlgoECDSA521,
-			ssh.KeyAlgoRSASHA512,
-			ssh.KeyAlgoRSASHA256,
-			ssh.KeyAlgoRSA,
-		},
+		User:              strings.TrimSpace(cfg.User),
+		Auth:              authMethods,
+		HostKeyCallback:   tofuHostKeyCallback(config.KnownHostsPath()),
+		Timeout:           20 * time.Second,
+		HostKeyAlgorithms: algorithms.HostKeys,
 		Config: ssh.Config{
-			Ciphers: []string{
-				"chacha20-poly1305@openssh.com",
-				"aes128-gcm@openssh.com",
-				"aes256-gcm@openssh.com",
-				"aes128-ctr",
-				"aes192-ctr",
-				"aes256-ctr",
-				"aes128-cbc",
-				"aes256-cbc",
-			},
-			KeyExchanges: []string{
-				"curve25519-sha256",
-				"curve25519-sha256@libssh.org",
-				"ecdh-sha2-nistp256",
-				"ecdh-sha2-nistp384",
-				"ecdh-sha2-nistp521",
-				"diffie-hellman-group14-sha256",
-				"diffie-hellman-group14-sha1",
-				"diffie-hellman-group-exchange-sha256",
-			},
-			MACs: []string{
-				"hmac-sha2-256-etm@openssh.com",
-				"hmac-sha2-512-etm@openssh.com",
-				"hmac-sha2-256",
-				"hmac-sha2-512",
-				"hmac-sha1",
-			},
+			Ciphers:      algorithms.Ciphers,
+			KeyExchanges: algorithms.KeyExchanges,
+			MACs:         algorithms.MACs,
 		},
 	}
 
