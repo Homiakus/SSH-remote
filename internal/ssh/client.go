@@ -145,196 +145,171 @@ func ExecuteCommand(client *ssh.Client, command string) (string, error) {
 	return string(output), nil
 }
 
-// ExecuteCommandContext выполняет команду с поддержкой отмены контекста.
-func ExecuteCommandContext(ctx context.Context, client *ssh.Client, command string) (string, error) {
+// ExecuteScript выполняет скрипт на удалённом сервере и возвращает вывод.
+func ExecuteScript(client *ssh.Client, scriptContent string) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("не удалось создать сессию: %w", err)
 	}
 	defer session.Close()
 
-	var output []byte
-	var runErr error
-	done := make(chan struct{})
+	session.Stdin = strings.NewReader(scriptContent)
+
+	output, err := session.CombinedOutput("bash -s")
+	if err != nil {
+		return string(output), fmt.Errorf("ошибка выполнения скрипта: %w\nВывод: %s", err, string(output))
+	}
+
+	return string(output), nil
+}
+
+// ScriptResult описывает результат потокового выполнения скрипта.
+type ScriptResult struct {
+	Output string
+	Err    error
+}
+
+// ExecuteScriptStream выполняет скрипт с потоковой передачей вывода.
+// ctx используется для отмены выполнения.
+func ExecuteScriptStream(ctx context.Context, client *ssh.Client, scriptContent string, outputCh chan<- string, doneCh chan<- ScriptResult) {
 	go func() {
-		output, runErr = session.CombinedOutput(command)
-		close(done)
-	}()
+		defer close(outputCh)
+		defer close(doneCh)
 
-	select {
-	case <-ctx.Done():
-		_ = session.Close()
-		<-done
-		return string(output), ctx.Err()
-	case <-done:
-		if runErr != nil {
-			return string(output), fmt.Errorf("ошибка выполнения команды: %w\nВывод: %s", runErr, string(output))
-		}
-		return string(output), nil
-	}
-}
-
-// StreamCommand выполняет команду и передаёт stdout/stderr в указанные writer'ы.
-func StreamCommand(client *ssh.Client, command string, stdout, stderr io.Writer) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("не удалось создать сессию: %w", err)
-	}
-	defer session.Close()
-
-	session.Stdout = stdout
-	session.Stderr = stderr
-	if err := session.Run(command); err != nil {
-		return fmt.Errorf("ошибка выполнения команды: %w", err)
-	}
-	return nil
-}
-
-// StreamCommandContext выполняет потоковую команду и завершает сессию при отмене.
-func StreamCommandContext(ctx context.Context, client *ssh.Client, command string, stdout, stderr io.Writer) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("не удалось создать сессию: %w", err)
-	}
-	defer session.Close()
-
-	session.Stdout = stdout
-	session.Stderr = stderr
-	done := make(chan error, 1)
-	go func() { done <- session.Run(command) }()
-
-	select {
-	case <-ctx.Done():
-		_ = session.Close()
-		<-done
-		return ctx.Err()
-	case err := <-done:
+		session, err := client.NewSession()
 		if err != nil {
-			return fmt.Errorf("ошибка выполнения команды: %w", err)
+			doneCh <- ScriptResult{Err: fmt.Errorf("не удалось создать сессию: %w", err)}
+			return
 		}
-		return nil
-	}
-}
+		defer session.Close()
 
-// OpenShell запускает интерактивный PTY shell.
-func OpenShell(client *ssh.Client, stdin io.Reader, stdout, stderr io.Writer, term string, rows, cols int) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("не удалось создать сессию: %w", err)
-	}
-	defer session.Close()
+		session.Stdin = strings.NewReader(scriptContent)
 
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}
-	if err := session.RequestPty(term, rows, cols, modes); err != nil {
-		return fmt.Errorf("не удалось запросить PTY: %w", err)
-	}
+		stdout, err := session.StdoutPipe()
+		if err != nil {
+			doneCh <- ScriptResult{Err: fmt.Errorf("не удалось получить stdout: %w", err)}
+			return
+		}
 
-	session.Stdin = stdin
-	session.Stdout = stdout
-	session.Stderr = stderr
-	if err := session.Shell(); err != nil {
-		return fmt.Errorf("не удалось запустить shell: %w", err)
-	}
-	return session.Wait()
-}
+		stderr, err := session.StderrPipe()
+		if err != nil {
+			doneCh <- ScriptResult{Err: fmt.Errorf("не удалось получить stderr: %w", err)}
+			return
+		}
 
-// OpenShellContext запускает shell и закрывает сессию при отмене контекста.
-func OpenShellContext(ctx context.Context, client *ssh.Client, stdin io.Reader, stdout, stderr io.Writer, term string, rows, cols int) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("не удалось создать сессию: %w", err)
-	}
-	defer session.Close()
+		if err := session.Start("bash -s"); err != nil {
+			doneCh <- ScriptResult{Err: fmt.Errorf("не удалось запустить скрипт: %w", err)}
+			return
+		}
 
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}
-	if err := session.RequestPty(term, rows, cols, modes); err != nil {
-		return fmt.Errorf("не удалось запросить PTY: %w", err)
-	}
+		// Читаем stdout и stderr в отдельных горутинах
+		var fullOutput strings.Builder
+		var fullOutputMu sync.Mutex
+		readDone := make(chan struct{}, 2)
 
-	session.Stdin = stdin
-	session.Stdout = stdout
-	session.Stderr = stderr
-	if err := session.Shell(); err != nil {
-		return fmt.Errorf("не удалось запустить shell: %w", err)
-	}
+		readPipe := func(pipe io.Reader) {
+			defer func() { readDone <- struct{}{} }()
+			buf := make([]byte, 1024)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				n, readErr := pipe.Read(buf)
+				if n > 0 {
+					line := string(buf[:n])
+					fullOutputMu.Lock()
+					fullOutput.WriteString(line)
+					fullOutputMu.Unlock()
+					select {
+					case outputCh <- line:
+					case <-ctx.Done():
+						return
+					}
+				}
+				if readErr != nil {
+					return
+				}
+			}
+		}
 
-	done := make(chan error, 1)
-	go func() { done <- session.Wait() }()
-	select {
-	case <-ctx.Done():
-		_ = session.Close()
-		<-done
-		return ctx.Err()
-	case err := <-done:
-		return err
-	}
-}
+		go readPipe(stdout)
+		go readPipe(stderr)
 
-// ResizePTY обновляет размер терминала для активной SSH-сессии.
-func ResizePTY(session *ssh.Session, rows, cols int) error {
-	return session.WindowChange(rows, cols)
-}
+		// Ждём завершения обоих чтений
+		<-readDone
+		<-readDone
 
-// RunCommandConcurrent безопасно собирает stdout/stderr параллельно.
-func RunCommandConcurrent(client *ssh.Client, command string) (stdout, stderr string, err error) {
-	session, err := client.NewSession()
-	if err != nil {
-		return "", "", fmt.Errorf("не удалось создать сессию: %w", err)
-	}
-	defer session.Close()
-
-	stdoutPipe, err := session.StdoutPipe()
-	if err != nil {
-		return "", "", err
-	}
-	stderrPipe, err := session.StderrPipe()
-	if err != nil {
-		return "", "", err
-	}
-	if err := session.Start(command); err != nil {
-		return "", "", err
-	}
-
-	var stdoutBytes, stderrBytes []byte
-	var stdoutErr, stderrErr error
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		stdoutBytes, stdoutErr = io.ReadAll(stdoutPipe)
+		err = session.Wait()
+		fullOutputMu.Lock()
+		output := fullOutput.String()
+		fullOutputMu.Unlock()
+		doneCh <- ScriptResult{
+			Output: output,
+			Err:    err,
+		}
 	}()
-	go func() {
-		defer wg.Done()
-		stderrBytes, stderrErr = io.ReadAll(stderrPipe)
-	}()
-	waitErr := session.Wait()
-	wg.Wait()
-
-	if stdoutErr != nil {
-		return string(stdoutBytes), string(stderrBytes), stdoutErr
-	}
-	if stderrErr != nil {
-		return string(stdoutBytes), string(stderrBytes), stderrErr
-	}
-	if waitErr != nil {
-		return string(stdoutBytes), string(stderrBytes), waitErr
-	}
-	return string(stdoutBytes), string(stderrBytes), nil
 }
 
-// PrivateKeyPermissionsTooOpen reports whether a private key file is too permissive.
-func PrivateKeyPermissionsTooOpen(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
+// buildAuthMethods формирует методы аутентификации для SSH-клиента.
+func buildAuthMethods(cfg *config.ServerConfig) ([]ssh.AuthMethod, error) {
+	switch config.NormalizeAuthMethod(cfg.AuthMethod) {
+	case config.AuthMethodKey:
+		return buildKeyAuth(cfg)
+	default:
+		return buildPasswordAuth(cfg.Password)
 	}
-	return info.Mode().Perm()&0o077 != 0
+}
+
+func buildPasswordAuth(password string) ([]ssh.AuthMethod, error) {
+	if password == "" {
+		return nil, fmt.Errorf("не указан SSH_PASSWORD")
+	}
+
+	passwordAuth := ssh.Password(password)
+	keyboardInteractive := ssh.KeyboardInteractive(
+		func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+			answers := make([]string, len(questions))
+			for i := range questions {
+				answers[i] = password
+			}
+			return answers, nil
+		},
+	)
+
+	return []ssh.AuthMethod{passwordAuth, keyboardInteractive}, nil
+}
+
+// buildKeyAuth создаёт аутентификацию по приватному ключу.
+// Поддерживает как vault-embedded ключи, так и файловые.
+func buildKeyAuth(cfg *config.ServerConfig) ([]ssh.AuthMethod, error) {
+	var keyData []byte
+	var err error
+
+	if config.IsEmbeddedKey(cfg.KeyPath) && cfg.EmbeddedKey != "" {
+		// Key is stored inside the encrypted vault.
+		keyData = []byte(cfg.EmbeddedKey)
+	} else {
+		resolvedPath, pathErr := config.ResolveKeyPath(cfg.KeyPath)
+		if pathErr != nil {
+			return nil, pathErr
+		}
+		keyData, err = os.ReadFile(resolvedPath)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось прочитать ключ %s: %w", resolvedPath, err)
+		}
+	}
+
+	var signer ssh.Signer
+	if cfg.Passphrase != "" {
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(cfg.Passphrase))
+	} else {
+		signer, err = ssh.ParsePrivateKey(keyData)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("не удалось распарсить ключ: %w", err)
+	}
+
+	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
 }
