@@ -97,6 +97,14 @@ func TestWriteWithOpsFailureMatrix(t *testing.T) {
 			case readErr == nil:
 				t.Fatalf("destination unexpectedly exists with %q", data)
 			}
+
+			leftovers, globErr := filepath.Glob(filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*"))
+			if globErr != nil {
+				t.Fatalf("glob temp leftovers: %v", globErr)
+			}
+			if len(leftovers) != 0 {
+				t.Fatalf("atomic write left temporary/backup files after failure: %v", leftovers)
+			}
 		})
 	}
 }
@@ -127,5 +135,13 @@ func TestWriteWithOpsFallbackReplacementSucceeds(t *testing.T) {
 	}
 	if got := ops.Calls(faultfs.OpRemove); got == 0 {
 		t.Fatal("expected backup cleanup remove call")
+	}
+
+	leftovers, globErr := filepath.Glob(filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*"))
+	if globErr != nil {
+		t.Fatalf("glob temp leftovers: %v", globErr)
+	}
+	if len(leftovers) != 0 {
+		t.Fatalf("fallback write left temporary/backup files: %v", leftovers)
 	}
 }
