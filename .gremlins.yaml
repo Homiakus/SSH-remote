@@ -13,7 +13,8 @@ unleash:
   threshold:
     efficacy: 80
     mutant-coverage: 70
-  exclude-files: []
+  exclude-files:
+    - "^internal/testkit/"
 
 mutants:
   arithmetic-base:

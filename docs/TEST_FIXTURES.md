@@ -10,6 +10,8 @@
 - Failure injection is ordinal (`fail the Nth operation`) so multi-step recovery/rollback paths are reproducible.
 - Fixtures must not weaken production verification. For example, the SSH fixture is paired with the real TOFU callback in integration tests; `InsecureIgnoreHostKey` is used only inside the fixture's self-test client.
 - A new production seam introduced for testability must keep the default production behavior unchanged.
+- `internal/testkit/**` is test infrastructure, not production behavior. It is excluded from mutation-threshold numerator/denominator, but its own tests, race checks, and consumers remain mandatory. Changes under `internal/testkit/**` are treated as test-suite changes by the mutation baseline ratchet.
+- Production seams exercised primarily through cross-package fixture tests must use integration-aware differential mutation testing so mutants are checked against the complete test suite.
 
 ## Catalog
 
@@ -53,6 +55,8 @@ The existing command fake now accepts a context-aware handler and a programmable
 `internal/atomicfile` contains the production atomic-write transaction behind an injectable filesystem-operations interface. `faultfs` can fail the Nth mkdir/create/write/chmod/close/rename/stat/remove operation.
 
 The matrix tests cover pre-commit failures, rename fallback, backup creation, restoration after replacement failure, and cleanup. `internal/config` delegates its vault/config atomic writes to this transaction.
+
+The Mutation Gate also uses the atomic-write success path as an execution canary: in an isolated source copy it changes the `MkdirAll` success predicate to its logical opposite and verifies the focused atomic-file test fails. If that deliberately fatal mutant survives, the mutation engine is considered untrustworthy and the gate fails before Gremlins thresholds are evaluated.
 
 ## Edge-space use
 

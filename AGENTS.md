@@ -67,15 +67,19 @@ For every task, record the dimensions actually exercised by its tests.
 
 Use Gremlins for Go mutation testing. A passing coverage percentage is not sufficient.
 
-For changed Go code on a PR:
+For changed production Go code on a PR, run the differential campaign in integration mode so a mutant is checked against the complete suite, including package-boundary integration tests:
 
 ```sh
-gremlins unleash --diff "origin/$GITHUB_BASE_REF" --coverpkg "./..." --threshold-efficacy 80 --threshold-mcover 70
+gremlins unleash --integration --diff "origin/$GITHUB_BASE_REF" --coverpkg "./..." --threshold-efficacy 80 --threshold-mcover 70
 ```
+
+Pure test infrastructure under `internal/testkit/` is excluded from the mutation numerator because it is not shipped behavior. Changes there are still covered by normal/race tests and are classified as test-suite changes for the full mutation-baseline ratchet.
+
+Before trusting Gremlins on CI, the Mutation Gate runs an independent execution canary: it introduces a known-fatal conditional mutation into the atomic-write transaction in an isolated copy and proves the focused test rejects it. If the canary survives, mutation results are invalid and the gate fails before threshold evaluation.
 
 Interpret survivors as missing test semantics first, not as permission to weaken mutation settings. Security-critical code (`internal/ssh`, `internal/config`, remote command/filesystem boundaries) targets **>= 90% efficacy** over time; the global floor is ratcheted upward and never lowered merely to make CI green.
 
-A survived mutant may be suppressed/excluded only with a written rationale proving equivalence or tool limitation.
+A survived mutant may be suppressed/excluded only with a written rationale proving equivalence or tool limitation. Test-support exclusions must be path-specific and must never hide production behavior that can execute in a release binary.
 
 ## 6. Controlled auto-fix policy
 
@@ -110,7 +114,7 @@ Run cheap, diagnostic gates first and expensive gates later:
 5. `go test -race -count=1 ./...` for concurrency-relevant changes (default for CI on Linux).
 6. edge-space/property/fuzz seed tests.
 7. `govulncheck ./...` for dependency/security-sensitive changes.
-8. differential mutation testing on the PR.
+8. mutation execution canary, then integration-aware differential mutation testing on the PR.
 9. relevant integration/E2E/performance gates.
 10. cross-platform build when platform-sensitive code changes.
 
