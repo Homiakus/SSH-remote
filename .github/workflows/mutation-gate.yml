@@ -77,8 +77,11 @@ jobs:
           cat mutation-canary.log
           echo "Mutation execution canary: KILLED as expected"
 
+      # v0.6.0 has a known integration-mode false-LIVED bug on Go 1.26
+      # (go-gremlins/gremlins#272). Pin the reviewed upstream fix from PR #293
+      # until it is included in a tagged release.
       - name: Install Gremlins
-        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@41553e12eb31122006fc27852b1cfe5e76cf5828
 
       - name: Detect mutation scope
         if: github.event_name == 'pull_request'
