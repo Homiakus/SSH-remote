@@ -58,13 +58,18 @@ func (ExecRunner) LookPath(name string) (string, error) {
 }
 
 type FakeRunner struct {
-	Calls   []Command
-	Handler func(Command) (Result, error)
-	Paths   map[string]string
+	Calls           []Command
+	Handler         func(Command) (Result, error)
+	HandlerContext  func(context.Context, Command) (Result, error)
+	Paths           map[string]string
+	LookPathHandler func(string) (string, error)
 }
 
-func (f *FakeRunner) Run(_ context.Context, cmd Command) (Result, error) {
+func (f *FakeRunner) Run(ctx context.Context, cmd Command) (Result, error) {
 	f.Calls = append(f.Calls, cmd)
+	if f.HandlerContext != nil {
+		return f.HandlerContext(ctx, cmd)
+	}
 	if f.Handler != nil {
 		return f.Handler(cmd)
 	}
@@ -72,6 +77,9 @@ func (f *FakeRunner) Run(_ context.Context, cmd Command) (Result, error) {
 }
 
 func (f *FakeRunner) LookPath(name string) (string, error) {
+	if f.LookPathHandler != nil {
+		return f.LookPathHandler(name)
+	}
 	if f.Paths != nil {
 		if value, ok := f.Paths[name]; ok {
 			return value, nil

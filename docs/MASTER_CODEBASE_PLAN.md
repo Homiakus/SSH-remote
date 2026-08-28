@@ -63,18 +63,36 @@ Baseline evidence captured on 2026-08-27:
 
 A scheduler-dependent WebSocket coverage fluctuation discovered by the first ratchet run was treated as a test determinism defect, not as permission to lower the baseline; the test now waits for handler cleanup before completing.
 
-### MP-0.3 — Deterministic test fixtures — `READY`
+### MP-0.3 — Deterministic test fixtures — `DONE`
 Dependencies: MP-0.1.
 
-Build reusable test fixtures/fakes for:
-- SSH server handshake/auth/session failures;
-- known_hosts/TOFU states;
-- SFTP-like filesystem semantics;
-- WebSocket connect/disconnect/backpressure;
-- command runner/stdout/stderr/cancellation;
-- filesystem atomic-write failures.
+Delivered reusable deterministic fixtures/fakes for:
+- in-process SSH handshake/auth/session/exec success and failure states with a stable Ed25519 host key;
+- `known_hosts`/TOFU missing, known-same, known-changed and corrupt states;
+- WebSocket connect/disconnect, framing boundaries and observable backpressure without wall-clock sleeps;
+- `RemoteFS` operation/result/error scripting with immutable call snapshots;
+- command runner stdout/stderr, cancellation and `LookPath` scripting;
+- atomic filesystem transactions with Nth-operation fault injection and rollback/cleanup assertions.
 
-Prefer in-process deterministic fixtures over tests that depend on public networks or wall-clock sleeps.
+Production testability seam:
+- config atomic persistence delegates to `internal/atomicfile` with unchanged default OS behavior;
+- failure matrix covers mkdir/create/write/chmod/close/rename/stat/backup/restore paths;
+- unsuccessful transactions are proven to preserve the old destination where required and leave no temp/backup artifacts.
+
+Mutation test-of-tests hardening discovered and corrected a tool-level blind spot rather than lowering thresholds:
+- an independent mutation execution canary proves a known-fatal atomic-write conditional is actually rejected by the test suite;
+- changed production code is tested in Gremlins integration mode so package-boundary tests participate;
+- pure `internal/testkit/**` support code is excluded only from the mutation numerator, while its normal/race tests remain mandatory;
+- Gremlins v0.6.0 false-`LIVED` behavior on Go 1.26 was traced to upstream issue #272; CI temporarily builds the reviewed upstream PR #293 fix from `refs/pull/293/head` only after verifying immutable SHA `41553e12eb31122006fc27852b1cfe5e76cf5828`.
+
+Exit evidence on PR #3:
+- baseline tests: PASS;
+- formatting/vet/coverage ratchet/race/build/`govulncheck`/module hygiene: PASS;
+- Windows/Linux/macOS amd64/arm64 cross-builds: 6/6 PASS;
+- mutation execution canary: KILLED as expected;
+- differential production mutation campaign: 14 killed, 0 lived, 0 not covered;
+- mutation efficacy: 100.00%; mutant coverage: 100.00%;
+- no quality, security, coverage or mutation threshold was lowered.
 
 ---
 
@@ -243,6 +261,6 @@ A release candidate must have a reproducible evidence bundle containing:
 
 ## Current execution pointer
 
-`NEXT = MP-0.3`
+`NEXT = MP-1.1`
 
-MP-0.1 and MP-0.2 are complete. Execute MP-0.3 through `docs/ENGINEERING_CONTROL_LOOP.md`; MP-1.1 is also dependency-ready but does not replace the single active execution pointer.
+MP-0.1, MP-0.2 and MP-0.3 are complete. Execute MP-1.1 through `docs/ENGINEERING_CONTROL_LOOP.md`; MP-1.2 becomes dependency-ready after MP-1.1, while MP-1.3 and MP-1.4 are now dependency-ready from MP-0.3 but do not replace the single active execution pointer.

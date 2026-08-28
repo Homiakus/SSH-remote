@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"sshpilot/internal/atomicfile"
 )
 
 var serversDir = "servers"
@@ -174,50 +176,6 @@ func ServerExists(name string) bool {
 	return err == nil
 }
 
-func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	temp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return fmt.Errorf("не удалось создать временный файл для %s: %w", path, err)
-	}
-	tempName := temp.Name()
-	defer func() {
-		if err != nil {
-			_ = os.Remove(tempName)
-		}
-	}()
-
-	if _, err = temp.Write(data); err != nil {
-		_ = temp.Close()
-		return fmt.Errorf("не удалось записать временный файл %s: %w", tempName, err)
-	}
-	if err = temp.Chmod(perm); err != nil {
-		_ = temp.Close()
-		return fmt.Errorf("не удалось выставить права на временный файл %s: %w", tempName, err)
-	}
-	if err = temp.Close(); err != nil {
-		return fmt.Errorf("не удалось закрыть временный файл %s: %w", tempName, err)
-	}
-
-	if err = os.Rename(tempName, path); err == nil {
-		return nil
-	}
-	renameErr := err
-	if _, statErr := os.Stat(path); statErr != nil {
-		return fmt.Errorf("не удалось заменить %s: %w", path, renameErr)
-	}
-	backup := tempName + ".old"
-	if backupErr := os.Rename(path, backup); backupErr != nil {
-		return fmt.Errorf("не удалось заменить %s: rename: %v; backup: %w", path, renameErr, backupErr)
-	}
-	if err = os.Rename(tempName, path); err != nil {
-		_ = os.Rename(backup, path)
-		return fmt.Errorf("не удалось заменить %s после backup: %w", path, err)
-	}
-	_ = os.Remove(backup)
-	return nil
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	return atomicfile.Write(path, data, perm)
 }

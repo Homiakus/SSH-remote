@@ -45,8 +45,68 @@ jobs:
       - name: Baseline tests
         run: go test -count=1 ./...
 
-      - name: Install Gremlins
-        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+      - name: Mutation execution canary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          canary_root="$(mktemp -d)"
+          trap 'rm -rf "$canary_root"' EXIT
+          git archive HEAD | tar -x -C "$canary_root"
+
+          CANARY_ROOT="$canary_root" python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["CANARY_ROOT"]) / "internal/atomicfile/atomicfile.go"
+          original = "if err := ops.MkdirAll(dir, 0o755); err != nil {"
+          mutated = "if err := ops.MkdirAll(dir, 0o755); err == nil {"
+          text = path.read_text(encoding="utf-8")
+          count = text.count(original)
+          if count != 1:
+              raise SystemExit(f"mutation canary anchor count = {count}, want 1")
+          path.write_text(text.replace(original, mutated, 1), encoding="utf-8")
+          PY
+
+          cd "$canary_root"
+          if go test -count=1 -run '^TestWriteCreatesAndReplacesFile$' ./internal/atomicfile > mutation-canary.log 2>&1; then
+            cat mutation-canary.log
+            echo "::error::mutation execution canary survived; test-of-tests engine cannot be trusted"
+            exit 1
+          fi
+          cat mutation-canary.log
+          echo "Mutation execution canary: KILLED as expected"
+
+      # v0.6.0 has a known integration-mode false-LIVED bug on Go 1.26
+      # (go-gremlins/gremlins#272). Build the reviewed upstream fix from PR #293
+      # after verifying its immutable head SHA. Remove this when a tagged release
+      # contains the fix.
+      - name: Install reviewed Gremlins integration fix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected="41553e12eb31122006fc27852b1cfe5e76cf5828"
+          gremlins_src="$(mktemp -d)"
+          trap 'rm -rf "$gremlins_src"' EXIT
+
+          git -C "$gremlins_src" init -q
+          git -C "$gremlins_src" remote add origin https://github.com/go-gremlins/gremlins.git
+          git -C "$gremlins_src" fetch --depth=2 origin refs/pull/293/head
+          actual="$(git -C "$gremlins_src" rev-parse FETCH_HEAD)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Gremlins PR #293 head moved: got $actual, expected $expected"
+            exit 1
+          fi
+
+          git -C "$gremlins_src" checkout -q --detach "$actual"
+          mkdir -p "$(go env GOPATH)/bin"
+          (
+            cd "$gremlins_src"
+            go build -trimpath -o "$(go env GOPATH)/bin/gremlins" ./cmd/gremlins
+          )
+          "$(go env GOPATH)/bin/gremlins" --help >/dev/null
+          echo "Gremlins integration fix verified at $actual"
 
       - name: Detect mutation scope
         if: github.event_name == 'pull_request'
@@ -59,7 +119,7 @@ jobs:
           test_go=false
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
-            if [[ "$file" == *_test.go ]]; then
+            if [[ "$file" == *_test.go || "$file" == internal/testkit/* ]]; then
               test_go=true
             else
               source_go=true
@@ -80,6 +140,7 @@ jobs:
         shell: bash
         run: |
           gremlins unleash \
+            --integration \
             --diff "origin/${GITHUB_BASE_REF}" \
             --coverpkg "./..." \
             --output-statuses lctv
